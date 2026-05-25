@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>СКУД - Ишчиларни Фильтрлаш</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-6">
@@ -15,7 +15,7 @@
                 <span class="text-3xl">📊</span>
                 <h1 class="text-2xl font-bold tracking-tight text-white">СКУД Тизими: Ишчиларни Саралаш (Зармитан / Gujumsoy)</h1>
             </div>
-            <span class="bg-blue-500/10 text-blue-400 text-xs px-2.5 py-1 rounded-full font-mono border border-blue-500/20">v1.2.0</span>
+            <span class="bg-blue-500/10 text-blue-400 text-xs px-2.5 py-1 rounded-full font-mono border border-blue-500/20">v1.3.0</span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -80,105 +80,10 @@
             return null;
         }
 
-        // Матндан соф рақам ажратиб олиш функцияси
+        // Матндан соф рақам ёки соатни (ЧЧ:ММ) ажратиб олиш функцияси (ИСПРАВЛЕНО)
         function parseHours(val) {
             if (val === null || val === undefined) return 0;
-            // Агар вергул бўлса нуқтага алмаштирамиз
-            let str = val.toString().replace(',', '.').replace(/[^0-9\.]/g, '').trim();
-            let num = parseFloat(str);
-            return isNaN(num) ? 0 : num;
-        }
+            let str = val.toString().trim();
 
-        // Excel ўқиш
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    
-                    excelData = XLSX.utils.sheet_to_json(worksheet);
-                    alert("Excel юкланди! Жами қаторлар: " + excelData.length);
-                } catch (error) {
-                    alert("Файлни ўқишда хатолик.");
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        });
-
-        // Фильтрлаш
-        function filterData() {
-            if (excelData.length === 0) {
-                alert("Илтимос, аввал Excel файлни юкланг!");
-                return;
-            }
-
-            const targetHours = parseFloat(document.getElementById('hoursInput').value) || 8;
-
-            globalFilteredData = excelData.filter(row => {
-                const hoursVal = findValue(row, ['соат', 'часы', 'hours', 'ишсоат', 'отработанно', 'ишсоати', 'время', 'duration']);
-                const hours = parseHours(hoursVal);
-                
-                const nameVal = findValue(row, ['фио', 'фиш', 'исм', 'ходим', 'имя', 'fio', 'fio']);
-                if (!nameVal && hours === 0) return false; // Бўм-бўш қаторларни ташлаб юбориш
-
-                return hours < targetHours;
-            });
-
-            document.getElementById('statsPanel').classList.remove('hidden');
-            document.getElementById('totalCount').innerText = excelData.length;
-            document.getElementById('badCount').innerText = globalFilteredData.length;
-
-            renderTable(globalFilteredData);
-        }
-
-        // Экранга чиқариш
-        function renderTable(data) {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-emerald-400 italic font-medium">Белгиланган соатдан кам ишлаган ходимлар топилмади! 👍</td></tr>';
-                return;
-            }
-
-            data.forEach(row => {
-                const id = findValue(row, ['ид', 'id', 'табель', 'номер', 'код', 'табельный']) || '-';
-                const fio = findValue(row, ['фио', 'фиш', 'исм', 'ходим', 'имя', 'fio']) || '-';
-                const department = findValue(row, ['бўлим', 'отдел', 'цех', 'департамент', 'отделение', 'служба']) || '-';
-                const hoursVal = findValue(row, ['соат', 'часы', 'hours', 'ишсоат', 'отработанно', 'ишсоати', 'время', 'duration']);
-                const hours = parseHours(hoursVal);
-
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-800/40 transition text-gray-300 border-b border-gray-800/50";
-                
-                tr.innerHTML = `
-                    <td class="p-3 font-mono text-gray-400">${id}</td>
-                    <td class="p-3 font-medium text-white">${fio}</td>
-                    <td class="p-3 text-gray-400">${department}</td>
-                    <td class="p-3"><span class="bg-gray-800 px-2.5 py-1 rounded text-blue-400 font-mono font-semibold">${hours} соат</span></td>
-                    <td class="p-3"><span class="inline-flex items-center text-red-400 font-medium">⚠️ Кам ишлаган</span></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // Экспорт Excel
-        function downloadFiltered() {
-            if (globalFilteredData.length === 0) {
-                alert("Юклаб олиш учун маълумот йўқ!");
-                return;
-            }
-            const worksheet = XLSX.utils.json_to_sheet(globalFilteredData);
-            const workbook = XLSX.utils.book_new();
-            XLSX.book_append_sheet(workbook, worksheet, "Кам ишлаганлар");
-            XLSX.writeFile(workbook, "skud_kam_ishlaganlar.xlsx");
-        }
-    </script>
-</body>
-</html>
+            // Если время указано в формате ЧЧ:ММ (например, 08:30)
+            if (str.includes(':')) {
