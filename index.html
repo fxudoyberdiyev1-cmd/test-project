@@ -3,277 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Интеграциялашган Мониторинг Тизими — Зармитон ва Гужумсой</title>
+    <title>СКУД - Ишчиларни Фильтрлаш</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-6">
 
-    <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div class="flex items-center gap-3">
-            <div class="p-2 bg-amber-500 text-gray-900 rounded-lg">
-                <i data-lucide="shield"></i>
+    <div class="max-w-6xl mx-auto bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+        <div class="flex items-center justify-between border-b border-gray-700 pb-4 mb-6">
+            <h1 class="text-2xl font-bold text-blue-400 flex items-center gap-2">
+                📊 СКУД Тизими: Ишчиларни Фильтрлаш
+            </h1>
+            <span class="bg-blue-900/50 text-blue-300 text-xs px-3 py-1 rounded-full border border-blue-700">v1.0.0</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="flex flex-col gap-1">
+                <label class="text-sm text-gray-400 font-medium">Excel файлни танланг:</label>
+                <input type="file" id="excelFile" accept=".xlsx, .xls" 
+                       class="bg-gray-700 p-2 rounded-lg border border-gray-600 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer">
             </div>
-            <div>
-                <h1 class="text-xl font-bold tracking-tight">КОН МОНИТОРИНГ ТИЗИМИ</h1>
-                <p class="text-xs text-amber-500 font-medium">Зармитон ва Гужумсой конлари | Интеграциялашган хавфсизлик</p>
+
+            <div class="flex flex-col gap-1">
+                <label class="text-sm text-gray-400 font-medium">Бўлим номи:</label>
+                <input type="text" id="deptInput" placeholder="Масалан: IT, Кончилик..." 
+                       class="bg-gray-700 p-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 text-sm">
+            </div>
+
+            <div class="flex flex-col gap-1">
+                <label class="text-sm text-gray-400 font-medium">Минимал иш соати:</label>
+                <input type="number" id="hoursInput" placeholder="Масалан: 8" 
+                       class="bg-gray-700 p-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 text-sm">
             </div>
         </div>
-        <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-400 rounded-full text-xs font-semibold border border-green-500/20">
-                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                СУНЪИЙ ИНТЕЛЛЕКТ: АКТИВ
-            </div>
-            <div class="text-right">
-                <p class="text-xs text-gray-400">Жорий вақт</p>
-                <p id="live-clock" class="text-sm font-mono font-bold text-gray-200">--:--:--</p>
-            </div>
+
+        <div class="flex gap-3 mb-6">
+            <button onclick="applyFilters()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2 rounded-lg transition text-sm cursor-pointer shadow-lg">
+                🔍 Фильтрлашни бошлаш
+            </button>
+            <button onclick="downloadFiltered()" id="downloadBtn" disabled class="bg-emerald-700 opacity-50 text-white font-medium px-5 py-2 rounded-lg transition text-sm cursor-not-allowed shadow-lg">
+                📥 Натижани юклаб олиш (Excel)
+            </button>
         </div>
-    </header>
 
-    <div class="flex">
-        <aside class="w-64 border-r border-gray-800 min-h-[calc(100vh-73px)] p-4 flex flex-col justify-between bg-gray-950/20">
-            <div class="space-y-1">
-                <p class="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Назорат Панели</p>
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 bg-amber-500 text-gray-950 font-medium rounded-lg transition">
-                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i> Бош саҳифа
-                </a>
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-gray-100 rounded-lg transition">
-                    <i data-lucide="scan-face" class="w-5 h-5"></i> СКУД Face ID
-                </a>
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-gray-100 rounded-lg transition">
-                    <i data-lucide="map-pin" class="w-5 h-5"></i> GPS / Wi-Fi Трекинг
-                </a>
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-gray-100 rounded-lg transition">
-                    <i data-lucide="clock" class="w-5 h-5"></i> Смена назорати
-                </a>
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-gray-100 rounded-lg transition">
-                    <i data-lucide="file-bar-chart" class="w-5 h-5"></i> Ҳисоботлар
-                </a>
-            </div>
-            
-            <div class="p-3 bg-gray-800/40 rounded-xl border border-gray-800 space-y-2">
-                <div class="flex justify-between items-center text-xs">
-                    <span class="text-gray-400">Зармитон кони:</span>
-                    <span class="text-green-400 font-bold">Нормал</span>
-                </div>
-                <div class="flex justify-between items-center text-xs">
-                    <span class="text-gray-400">Гужумсой кони:</span>
-                    <span class="text-green-400 font-bold">Нормал</span>
-                </div>
-            </div>
-        </aside>
-
-        <main class="flex-1 p-6 space-y-6">
-
-            <section class="bg-red-950/20 border border-red-500/30 rounded-xl p-4 flex gap-4 items-start">
-                <div class="p-3 bg-red-500/20 text-red-400 rounded-lg animate-bounce">
-                    <i data-lucide="triangle-alert" class="w-6 h-6"></i>
-                </div>
-                <div class="flex-1">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-red-400 font-bold tracking-wide text-sm uppercase">Сунъий интеллект тезкор огоҳлантириши</h3>
-                        <span class="text-xs text-red-400/70 font-mono">Айнан ҳозир</span>
-                    </div>
-                    <p class="text-gray-300 text-sm mt-1">
-                        <strong class="text-white">Дистанцион эшик очилиши таҳлили:</strong> Гужумсой кони 3-блок хавфли зонасига бегона шахс киришга уринди. Эшик ИИ томонидан автоматик блокланди.
-                    </p>
-                </div>
-            </section>
-
-            <section class="grid grid-cols-1 md-grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-gray-850 p-5 rounded-xl border border-gray-800 flex items-center justify-between">
-                    <div class="space-y-1">
-                        <p class="text-xs font-semibold text-gray-400 uppercase">Ишда мавжуд ходимлар</p>
-                        <p class="text-3xl font-bold font-mono text-gray-100">342 <span class="text-xs text-gray-500 font-normal">/ 350</span></p>
-                        <p class="text-xs text-green-400 flex items-center gap-1"><i data-lucide="trending-up" class="w-3 h-3"></i> 97.7% давомад</p>
-                    </div>
-                    <div class="p-3 bg-blue-500/10 text-blue-400 rounded-xl"><i data-lucide="scan-face" class="w-6 h-6"></i></div>
-                </div>
-
-                <div class="bg-gray-850 p-5 rounded-xl border border-gray-800 flex items-center justify-between">
-                    <div class="space-y-1">
-                        <p class="text-xs font-semibold text-gray-400 uppercase">Ер остидаги ишчилар</p>
-                        <p class="text-3xl font-bold font-mono text-amber-400">189 <span class="text-xs text-gray-500 font-normal">актив</span></p>
-                        <p class="text-xs text-gray-400">Жорий жойлашув назоратда</p>
-                    </div>
-                    <div class="p-3 bg-amber-500/10 text-amber-400 rounded-xl"><i data-lucide="map-pin" class="w-6 h-6"></i></div>
-                </div>
-
-                <div class="bg-gray-850 p-5 rounded-xl border border-gray-800 flex items-center justify-between">
-                    <div class="space-y-1">
-                        <p class="text-xs font-semibold text-gray-400 uppercase">Кечикиш ҳолатлари</p>
-                        <p class="text-3xl font-bold font-mono text-red-400">4 <span class="text-xs text-gray-500 font-normal">ходим</span></p>
-                        <p class="text-xs text-red-400/80">ИИ томонидан огоҳлантирилди</p>
-                    </div>
-                    <div class="p-3 bg-red-500/10 text-red-400 rounded-xl"><i data-lucide="clock-alert" class="w-6 h-6"></i></div>
-                </div>
-
-                <div class="bg-gray-850 p-5 rounded-xl border border-gray-800 flex items-center justify-between">
-                    <div class="space-y-1">
-                        <p class="text-xs font-semibold text-gray-400 uppercase">Топширилмаган фонарлар</p>
-                        <p class="text-3xl font-bold font-mono text-purple-400">0 <span class="text-xs text-gray-500 font-normal">дона</span></p>
-                        <p class="text-xs text-green-400 font-medium">Ҳамаси топширилган</p>
-                    </div>
-                    <div class="p-3 bg-purple-500/10 text-purple-400 rounded-xl"><i data-lucide="battery-charging" class="w-6 h-6"></i></div>
-                </div>
-            </section>
-
-            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="bg-gray-850 p-5 rounded-xl border border-gray-800 lg:col-span-2 space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-sm font-bold text-gray-200 tracking-wide uppercase">Смена соатлари бўйича давомад графиги (8, 9, 12 соатлик)</h2>
-                        <i data-lucide="activity" class="w-4 h-4 text-gray-500"></i>
-                    </div>
-                    <div class="h-64 flex items-center justify-center">
-                        <canvas id="shiftChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="bg-gray-850 p-5 rounded-xl border border-gray-800 space-y-4">
-                    <h2 class="text-sm font-bold text-gray-200 tracking-wide uppercase">ИИ Хавфсизлик Таҳлили</h2>
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <span class="text-gray-400">Инсон омили камайтирилиши</span>
-                                <span class="text-amber-400 font-bold">94%</span>
-                            </div>
-                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                                <div class="bg-amber-500 h-full rounded-full" style="width: 94%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <span class="text-gray-400">Хавфли зоналарга кириш назорати</span>
-                                <span class="text-green-400 font-bold">100%</span>
-                            </div>
-                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                                <div class="bg-green-500 h-full rounded-full" style="width: 100%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <span class="text-gray-400">Йўқолган/Ҳаракатсиз ишчиларни аниқлаш тезлиги</span>
-                                <span class="text-blue-400 font-bold">&lt; 3 сония</span>
-                            </div>
-                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                                <div class="bg-blue-500 h-full rounded-full" style="width: 88%"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="pt-4 border-t border-gray-800 grid grid-cols-2 gap-2">
-                        <button onclick="triggerAlert('Зармитон')" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs uppercase transition flex items-center justify-center gap-2 cursor-pointer">
-                            <i data-lucide="megaphone" class="w-4 h-4"></i> Зармитон Тревога
-                        </button>
-                        <button onclick="triggerAlert('Гужумсой')" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs uppercase transition flex items-center justify-center gap-2 cursor-pointer">
-                            <i data-lucide="megaphone" class="w-4 h-4"></i> Гужумсой Тревога
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <section class="bg-gray-850 rounded-xl border border-gray-800 overflow-hidden">
-                <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-900/40">
-                    <h2 class="text-sm font-bold text-gray-200 tracking-wide uppercase">Реал вақтдаги СКУД Face ID ва GPS Журнали</h2>
-                    <span class="text-xs text-amber-500 font-mono">Автоматик янгиланиш</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-gray-800/50 text-gray-400 border-b border-gray-800 text-xs uppercase font-semibold">
-                                <th class="p-4">Ходим Ф.И.Ш.</th>
-                                <th class="p-4">Кон номи</th>
-                                <th class="p-4">СКУД Face ID вақти</th>
-                                <th class="p-4">Смена тартиби</th>
-                                <th class="p-4">GPS / Wi-Fi Статус</th>
-                                <th class="p-4 text-right">ИИ Тезкор Қарори</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-800 text-gray-300">
-                            <tr class="hover:bg-gray-800/30 transition">
-                                <td class="p-4 font-medium text-white flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">РА</div>
-                                    Раҳимов А. Б.
-                                </td>
-                                <td class="p-4">Зармитон</td>
-                                <td class="p-4 font-mono text-gray-400">07:54:12</td>
-                                <td class="p-4"><span class="px-2 py-0.5 bg-gray-800 rounded text-xs">8 соатлик</span></td>
-                                <td class="p-4 text-green-400 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Ер остида (Блок 1)</td>
-                                <td class="p-4 text-right"><span class="text-xs bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-1 rounded-md">Рухсат берилди</span></td>
-                            </tr>
-                            <tr class="hover:bg-gray-800/30 transition">
-                                <td class="p-4 font-medium text-white flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">ШО</div>
-                                    Шарипов О. Ж.
-                                </td>
-                                <td class="p-4">Гужумсой</td>
-                                <td class="p-4 font-mono text-gray-400">08:15:34</td>
-                                <td class="p-4"><span class="px-2 py-0.5 bg-gray-800 rounded text-xs">12 соатлик</span></td>
-                                <td class="p-4 text-red-400 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Кечикди / Фонар актив</td>
-                                <td class="p-4 text-right"><span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 rounded-md">Огоҳлантириш юборилди</span></td>
-                            </tr>
-                            <tr class="hover:bg-gray-800/30 transition">
-                                <td class="p-4 font-medium text-white flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">КМ</div>
-                                    Каримов М. Ш.
-                                </td>
-                                <td class="p-4">Зармитон</td>
-                                <td class="p-4 font-mono text-gray-400">07:48:22</td>
-                                <td class="p-4"><span class="px-2 py-0.5 bg-gray-800 rounded text-xs">9 соатлик</span></td>
-                                <td class="p-4 text-gray-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span> Ер устида (Смена якуни)</td>
-                                <td class="p-4 text-right"><span class="text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-1 rounded-md">Трекер қайтарилди</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </main>
+        <div id="statusMessage" class="text-sm text-gray-400 mb-3 hidden"></div>
+        
+        <div class="overflow-x-auto rounded-lg border border-gray-700">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                    <tr class="bg-gray-700/50 border-b border-gray-700 text-gray-300">
+                        <th class="p-3 font-semibold">ИД</th>
+                        <th class="p-3 font-semibold">Ф.И.Ш.</th>
+                        <th class="p-3 font-semibold">Бўлим</th>
+                        <th class="p-3 font-semibold">Иш соати</th>
+                        <th class="p-3 font-semibold">Ҳолат</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-gray-800">
+                    <tr>
+                        <td colspan="5" class="p-8 text-center text-gray-500 italic">Маълумот кўриш учун аввал Excel файл юкланг...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        // Инициализация иконок Lucide
-        lucide.createIcons();
+        let originalData = [];
+        let filteredData = [];
 
-        // Живые часы на панели
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('live-clock').textContent = now.toLocaleTimeString('ru-RU');
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
+        // Файлни ўқиб олиш
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        // График давомада смен через Chart.js
-        const ctx = document.getElementById('shiftChart').getContext('25d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['8 соатлик смена', '9 соатлик смена', '12 соатлик смена'],
-                datasets: [{
-                    label: 'Ишчилар сони (Жорий смена)',
-                    data: [142, 85, 115],
-                    backgroundColor: ['#f59e0b', '#3b82f6', '#10b981'],
-                    borderWidth: 0,
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
-                    x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
-                }
-            }
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // СКУД маълумотларини JSON форматга ўтказиш
+                originalData = XLSX.utils.sheet_to_json(worksheet);
+                filteredData = [...originalData];
+                
+                document.getElementById('statusMessage').classList.remove('hidden');
+                document.getElementById('statusMessage').innerText = `Базадан жами ${originalData.length} та ишчи юкланди.`;
+                
+                renderTable(filteredData);
+            };
+            reader.readAsArrayBuffer(file);
         });
 
-        // Функция симуляции тревоги ИИ
-        function triggerAlert(mineName) {
-            alert("ДИҚҚАТ! СУНЪИЙ ИНТЕЛЛЕКТ СИГНАЛИ: " + mineName + " конида фавқулодда ҳолат эълон қилинди. Барча ишчиларнинг GPS жойлашуви текширилмоқда!");
+        // Фильтрларни қўллаш
+        function applyFilters() {
+            if (originalData.length === 0) {
+                alert("Илтимос, аввал СКУД Excel файлини юкланг!");
+                return;
+            }
+
+            const deptValue = document.getElementById('deptInput').value.toLowerCase().trim();
+            const hoursValue = parseFloat(document.getElementById('hoursInput').value);
+
+            filteredData = originalData.filter(row => {
+                // Устун номларини СКУД файлингизга мос ҳолда текширинг
+                const rowDept = String(row['Бўлим'] || row['Отдел'] || '').toLowerCase();
+                const rowHours = parseFloat(row['Иш соати'] || row['Время'] || 0);
+
+                const matchDept = !deptValue || rowDept.includes(deptValue);
+                const matchHours = isNaN(hoursValue) || rowHours >= hoursValue;
+
+                return matchDept && matchHours;
+            });
+
+            document.getElementById('statusMessage').innerText = `Фильтр натижаси: ${filteredData.length} та ходим топилди.`;
+            
+            // Натижа юклаш тугмасини активлаштириш
+            const downloadBtn = document.getElementById('downloadBtn');
+            if (filteredData.length > 0) {
+                downloadBtn.disabled = false;
+                downloadBtn.className = "bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2 rounded-lg transition text-sm cursor-pointer shadow-lg";
+            } else {
+                downloadBtn.disabled = true;
+                downloadBtn.className = "bg-emerald-700 opacity-50 text-white font-medium px-5 py-2 rounded-lg transition text-sm cursor-not-allowed shadow-lg";
+            }
+
+            renderTable(filteredData);
+        }
+
+        // Жадвални экранга чиқариш
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-400 italic">Қидирув бўйича ходим топилмади.</td></tr>`;
+                return;
+            }
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-700/30 transition text-gray-300";
+                tr.innerHTML = `
+                    <td class="p-3">${row['ИД'] || row['ID'] || '-'}</td>
+                    <td class="p-3 font-medium text-white">${row['Ф.И.Ш.'] || row['ФИО'] || row['Исм'] || '-'}</td>
+                    <td class="p-3">${row['Бўлим'] || row['Отдел'] || '-'}</td>
+                    <td class="p-3"><span class="bg-gray-800 px-2 py-0.5 rounded text-blue-400 font-mono">${row['Иш соати'] || row['Время'] || 0} с.</span></td>
+                    <td class="p-3"><span class="text-emerald-400">✔️ Ишда</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Фильтрланган янги Excel файлни юклаб олиш
+        function downloadFiltered() {
+            if (filteredData.length === 0) return;
+            
+            const worksheet = XLSX.utils.json_to_sheet(filteredData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.book_append_sheet(workbook, worksheet, "Фильтрланган ишчилар");
+            
+            // Файлни компьютер хотирасига ёзиш
+            XLSX.writeFile(workbook, "skud_filtrланган_ходимлар.xlsx");
         }
     </script>
 </body>
