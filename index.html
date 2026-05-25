@@ -9,13 +9,13 @@
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-6">
 
-    <div class="max-w-5xl mx-auto">
+    <div class="max-w-6xl mx-auto">
         <div class="flex items-center justify-between border-b border-gray-800 pb-5 mb-6">
             <div class="flex items-center space-x-3">
                 <span class="text-3xl">📊</span>
                 <h1 class="text-2xl font-bold tracking-tight text-white">СКУД Тизими: Ишчиларни Саралаш (Зармитан / Гужумсой)</h1>
             </div>
-            <span class="bg-blue-500/10 text-blue-400 text-xs px-2.5 py-1 rounded-full font-mono border border-blue-500/20">v1.0.0</span>
+            <span class="bg-blue-500/10 text-blue-400 text-xs px-2.5 py-1 rounded-full font-mono border border-blue-500/20">v1.1.0</span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -25,7 +25,7 @@
             </div>
 
             <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 flex flex-col justify-between">
-                <label class="block text-sm font-medium text-gray-400 mb-2">Минимал иш соати:</label>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Минимал иш соатидан камлар:</label>
                 <input type="number" id="hoursInput" value="8" min="1" max="24" class="block w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500" />
             </div>
 
@@ -34,9 +34,13 @@
                     <span>🔍 Фильтрлашни бошлаш</span>
                 </button>
                 <button onclick="downloadFiltered()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition active:scale-95 shadow-lg shadow-emerald-600/10 flex items-center justify-center cursor-pointer" title="Натижани Excel қилиб юклаб олиш">
-                    <span>📥 Юклаш</span>
+                    <span>📥 Excel Юклаш</span>
                 </button>
             </div>
+        </div>
+
+        <div id="statsPanel" class="hidden mb-4 p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-sm font-medium">
+            Умумий ходимлар: <span id="totalCount" class="font-bold">0</span> та. Кам ишлаган қоидабузарлар: <span id="badCount" class="font-bold text-red-400">0</span> та.
         </div>
 
         <div class="bg-gray-800/30 rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
@@ -44,9 +48,9 @@
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-gray-800/80 text-gray-300 border-b border-gray-700 text-sm font-semibold">
-                            <th class="p-3.5">ИД</th>
-                            <th class="p-3.5">Ф.И.Ш.</th>
-                            <th class="p-3.5">Бўлим</th>
+                            <th class="p-3.5">ИД (Табель)</th>
+                            <th class="p-3.5">Ф.И.Ш. (Ходим)</th>
+                            <th class="p-3.5">Бўлим (Цех)</th>
                             <th class="p-3.5">Иш соати</th>
                             <th class="p-3.5">Ҳолат</th>
                         </tr>
@@ -65,7 +69,18 @@
         let excelData = [];
         let globalFilteredData = [];
 
-        // Excel файлни ўқиш ва хотирага олиш
+        // Калит сўзларни автоматик аниқлаш функцияси
+        function findValue(row, keys) {
+            for (let key of Object.keys(row)) {
+                const normalizedKey = key.toString().toLowerCase().trim();
+                if (keys.some(k => normalizedKey.includes(k))) {
+                    return row[key];
+                }
+            }
+            return null;
+        }
+
+        // Excel файлни ўқиш
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -78,17 +93,16 @@
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
                     
-                    // Маълумотларни хавфсиз равишда JSON га ўтказиш
                     excelData = XLSX.utils.sheet_to_json(worksheet);
-                    alert("Excel файл муваффақиятли юкланди! Энди фильтрлашни бошлашингиз мумкин.");
+                    alert("Excel файл муваффақиятли юкланди! Жами қаторлар: " + excelData.length);
                 } catch (error) {
-                    alert("Файл ўқишда хатолик бўлди. Файл бузилмаганлигини текширинг.");
+                    alert("Файл ўқишда хатолик. Excel форматини текширинг.");
                 }
             };
             reader.readAsArrayBuffer(file);
         });
 
-        // Ходимларни соати бўйича хавфсиз фильтрлаш (Қотиб қолмайди)
+        // Фильтрлаш функцияси
         function filterData() {
             if (excelData.length === 0) {
                 alert("Илтимос, аввал Excel файлни юкланг!");
@@ -96,61 +110,68 @@
             }
 
             const targetHours = parseFloat(document.getElementById('hoursInput').value) || 8;
-            
-            // Белгиланган иш соатидан кам ишлаган ходимларни саралаш
+
             globalFilteredData = excelData.filter(row => {
-                // Турлича ёзилиши мумкин бўлган устун номларини текшириш
-                const hoursRaw = row['Иш соати'] || row['Отработанные часы'] || row['Часы'] || row['Иш соат'] || 0;
-                const hours = parseFloat(hoursRaw);
+                // Иш соати устунини қидириш (турли тилларда)
+                const hoursVal = findValue(row, ['соат', 'часы', 'hours', 'иш соат', 'отработанно', 'иш соати']);
+                const hours = parseFloat(hoursVal || 0);
+                
+                // Агар қатор бутунлай бўш бўлса ёки исми йўқ бўлса ўтказиб юборамиз
+                const nameVal = findValue(row, ['фио', 'ф.и.ш', 'исм', 'ходим', 'имя', 'fio']);
+                if (!nameVal && hours === 0) return false;
+
                 return hours < targetHours;
             });
+
+            // Статистикани янгилаш
+            document.getElementById('statsPanel').classList.remove('hidden');
+            document.getElementById('totalCount').innerText = excelData.length;
+            document.getElementById('badCount').innerText = globalFilteredData.length;
 
             renderTable(globalFilteredData);
         }
 
-        // Саҳифадаги жадвалга чиқариш
+        // Экранга чиқариш
         function renderTable(data) {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-emerald-400 italic font-medium">Белгиланган соатдан кам ишлаган қоидабузар ходимлар топилмади! 👍</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-emerald-400 italic font-medium">Белгиланган соатдан кам ишлаган ходимлар топилмади! 👍</td></tr>';
                 return;
             }
 
             data.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-800/40 transition text-gray-300";
-                
-                const id = row['ИД'] || row['ID'] || row['Табель'] || '-';
-                const fio = row['Ф.И.Ш.'] || row['ФИО'] || row['Исми'] || row['Ходим'] || '-';
-                const department = row['Бўлим'] || row['Отдел'] || row['Цех'] || '-';
-                const hoursRaw = row['Иш соати'] || row['Отработанные часы'] || row['Часы'] || row['Иш соат'] || 0;
+                // Ақлли қидирув тизими орқали устунларни топиш
+                const id = findValue(row, ['ид', 'id', 'табель', 'номер', 'код']) || '-';
+                const fio = findValue(row, ['фио', 'ф.и.ш', 'исм', 'ходим', 'имя', 'fio']) || '-';
+                const department = findValue(row, ['бўлим', 'отдел', 'цех', 'департамент', 'отделение']) || '-';
+                const hours = findValue(row, ['соат', 'часы', 'hours', 'иш соат', 'отработанно', 'иш соати']) || 0;
 
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-800/40 transition text-gray-300 border-b border-gray-800/50";
+                
                 tr.innerHTML = `
                     <td class="p-3 font-mono text-gray-400">${id}</td>
                     <td class="p-3 font-medium text-white">${fio}</td>
                     <td class="p-3 text-gray-400">${department}</td>
-                    <td class="p-3"><span class="bg-gray-800 px-2.5 py-1 rounded text-blue-400 font-mono font-semibold">${hoursRaw} соат</span></td>
+                    <td class="p-3"><span class="bg-gray-800 px-2.5 py-1 rounded text-blue-400 font-mono font-semibold">${hours} соат</span></td>
                     <td class="p-3"><span class="inline-flex items-center text-red-400 font-medium">⚠️ Кам ишлаган</span></td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        // Фильтрланган янги Excel файлни компьютерникига юклаб олиш
+        // Экспорт Excel
         function downloadFiltered() {
             if (globalFilteredData.length === 0) {
-                alert("Юклаб олиш учун аввал фильтрланган маълумот мавжуд бўлиши керак!");
+                alert("Юклаб олиш учун маълумот йўқ!");
                 return;
             }
-
             const worksheet = XLSX.utils.json_to_sheet(globalFilteredData);
             const workbook = XLSX.utils.book_new();
             XLSX.book_append_sheet(workbook, worksheet, "Кам ишлаганлар");
-
-            // Файлни СКУД номи билан автомат юклаш
-            XLSX.writeFile(workbook, "skud_filtrланган_ходимлар.xlsx");
+            XLSX.writeFile(workbook, "skud_kam_ishlaganlar.xlsx");
         }
     </script>
 </body>
