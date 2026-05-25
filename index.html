@@ -27,8 +27,8 @@
         <div id="dropzone" class="p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-center bg-white dark:bg-gray-800 cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-colors">
             <input type="file" id="fileInput" accept=".xlsx, .xls" class="hidden">
             <div class="space-y-2">
-                <p class="text-lg font-medium">Excel faylni bu yerga tashlang yoki tanlash uchun bosing</p>
-                <p class="text-sm text-gray-400">Tizim (Time, Device, Door, Person Name) ustunlarini avtomat tahlil qiladi</p>
+                <p id="dropzoneText" class="text-lg font-medium">Excel faylni bu yerga tashlang yoki tanlash uchun bosing</p>
+                <p class="text-sm text-gray-400">Haqiqiy loglar formati (Time, Device, Door, Person Name) bo'yicha avtomat tahlil</p>
             </div>
         </div>
 
@@ -55,13 +55,9 @@
 
         <div id="tableContainer" class="hidden p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
             <div class="flex flex-col md:flex-row gap-4 justify-between items-center">
-                <input type="text" id="searchInput" placeholder="F.I.SH yoki Qurilma bo'yicha qidirish..." class="p-2.5 w-full md:w-1/3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                <div class="flex gap-2">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Кириш</span>
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Чиқиш</span>
-                </div>
+                <input type="text" id="searchInput" placeholder="Xodim ismi yoki Qurilma bo'yicha qidirish..." class="p-2.5 w-full md:w-1/3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
             </div>
-            <div class="overflow-x-auto max-h-[600px] rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="overflow-x-auto max-h-[550px] rounded-lg border border-gray-200 dark:border-gray-700">
                 <table class="w-full text-left text-sm border-collapse">
                     <thead class="sticky top-0 bg-gray-100 dark:bg-gray-700 font-semibold text-gray-700 dark:text-gray-200 shadow-sm">
                         <tr>
@@ -81,14 +77,13 @@
     <script>
         let appData = [];
 
-        // Dark/Light Mode toggle
+        // Dark Mode toggle
         const themeToggle = document.getElementById('themeToggle');
         themeToggle.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
             themeToggle.innerText = document.documentElement.classList.contains('dark') ? '☀️ Light Mode' : '🌙 Dark Mode';
         });
 
-        // File Uploader Event Listeners
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('fileInput');
         const errorAlert = document.getElementById('errorAlert');
@@ -118,13 +113,16 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                     
-                    if(json.length === 0) {
-                        showError("Xatolik: Excel fayli bo'sh yoki o'qib bo'lmadi!");
+                    // { header: 1 } orqali birinchi qatordagi haqiqiy nomlarni o'qiymiz
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                    
+                    if (rows.length < 2) {
+                        showError("Xatolik: Excel fayli bo'sh yoki ma'lumot yetarli emas!");
                         return;
                     }
-                    processData(json);
+                    
+                    processRawRows(rows);
                 } catch (err) {
                     showError("Faylni tahlil qilishda xatolik: " + err.message);
                 }
@@ -132,87 +130,75 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // Data processing engine specifically optimized for your Excel format
-        function processData(rawData) {
-            let totalHours = 0;
-            const workerHours = {};
-            const activeStatusMap = {}; // Hozir ichkaridami yoki tashqaridami kuzatish uchun
-            let insideCount = 0;
+        function processRawRows(rows) {
+            // Birinchi qatordan ustunlar indeksini aniqlaymiz (Masalan: Time -> 0, Person Name -> 7)
+            const headers = rows[0].map(h => h.toString().trim());
+            
+            const idxTime = headers.findIndex(h => h === "Time");
+            const idxName = headers.findIndex(h => h === "Person Name");
+            const idxDevice = headers.findIndex(h => h === "Device");
+            const idxDoor = headers.findIndex(h => h === "Door");
 
-            // Avtomatik ustun nomlarini qidirish (Katta-kichik harflarni to'g'rilash)
-            const sample = rawData[0];
-            const findKey = (possibleNames) => {
-                return Object.keys(sample).find(k => possibleNames.includes(k.trim())) || null;
-            };
-
-            const keyTime = findKey(["Time", "vaqt", "Sana"]);
-            const keyDevice = findKey(["Device", "Qurilma"]);
-            const keyDoor = findKey(["Door", "Eshik"]);
-            const keyName = findKey(["Person Name", "F.I.SH", "Name"]);
-
-            if (!keyTime || !keyName) {
-                showError("Xatolik: Excelda majburiy 'Time' va 'Person Name' ustunlari topilmadi!");
+            if (idxTime === -1 || idxName === -1) {
+                showError("Xatolik: Excel faylida 'Time' yoki 'Person Name' ustunlari topilmadi! Iltimos asl SKUD eksport faylini yuklang.");
                 return;
             }
 
-            // Ma'lumotlarni tartiblash va tozalash (Vaqt bo'yicha o'sish tartibida joylashtiramiz)
-            appData = rawData
-                .filter(row => row[keyName] && row[keyName].toString().trim() !== "" && !row[keyName].toString().includes("Stranger"))
+            let totalHours = 0;
+            const workerHours = {};
+            const activeStatusMap = {};
+            
+            // Ma'lumot qatorlarini tozalash va formatlash
+            appData = rows.slice(1)
+                .filter(row => row[idxName] && row[idxName].toString().trim() !== "" && !row[idxName].toString().includes("Stranger"))
                 .map(row => {
-                    const rawTime = row[keyTime];
-                    let formattedTime = rawTime;
+                    const name = row[idxName].toString().trim();
+                    const timeStr = row[idxTime].toString().trim();
+                    const deviceStr = row[idxDevice] ? row[idxDevice].toString() : "";
+                    const doorStr = row[idxDoor] ? row[idxDoor].toString() : "";
                     
-                    // Agar Excel sana formatida bergan bo'lsa konvertatsiya qilish
-                    if (typeof rawTime === 'number') {
-                        const dateObj = XLSX.utils.parse_date(rawTime);
-                        formattedTime = dateObj.toISOString().replace('T', ' ').substring(0, 19);
-                    }
-
-                    const deviceStr = row[keyDevice] ? row[keyDevice].toString() : "";
-                    const doorStr = row[keyDoor] ? row[keyDoor].toString() : "";
-                    
-                    // Kirish yoki chiqishligini matndan aniqlash (Вход / Выход / Кириш / Чиқиш)
+                    // Yo'nalishni matndan qidirish (Вход / Выход / Кириш / Чиқиш)
                     let direction = "KIRISH";
-                    if (deviceStr.includes("Выход") || deviceStr.includes("Chiqish") || doorStr.includes("Чиқиш") || doorStr.includes("Выход")) {
+                    if (deviceStr.includes("Выход") || deviceStr.includes("Chiqish") || 
+                        doorStr.includes("Чиқиш") || doorStr.includes("Выход") || doorStr.includes("Чилиш")) {
                         direction = "CHIQISH";
                     }
 
                     return {
-                        time: formattedTime,
-                        name: row[keyName].toString().trim(),
+                        time: timeStr,
+                        name: name,
                         device: deviceStr,
                         door: doorStr,
                         direction: direction
                     };
                 });
 
-            // Vaqt bo'yicha saralash (Loglarni xronologik tartibga keltiramiz)
+            // Xronologik tartibda saralash (Eski vaqtdan yangi vaqtga qarab)
             appData.sort((a, b) => new Date(a.time) - new Date(b.time));
 
-            // Ish soatlarini va hozir ichkaridagilar sonini hisoblash algoritmi
+            // Ish soatlarini hisoblash logikasi
             appData.forEach(log => {
                 const worker = log.name;
                 const logTime = new Date(log.time);
 
                 if (log.direction === "KIRISH") {
-                    activeStatusMap[worker] = logTime; // Kirgan vaqtini yozib qo'yamiz
+                    activeStatusMap[worker] = logTime;
                 } else if (log.direction === "CHIQISH" && activeStatusMap[worker]) {
-                    // Agar oldin kirgan bo'lsa, farqni hisoblaymiz (soatda)
                     const diffMs = logTime - activeStatusMap[worker];
                     const diffHours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
                     
-                    if (diffHours > 0 && diffHours < 24) { // Reallikka yaqin log xatoliklarini cheklash
+                    if (diffHours > 0 && diffHours < 24) {
                         workerHours[worker] = (workerHours[worker] || 0) + diffHours;
                         totalHours += diffHours;
                     }
-                    delete activeStatusMap[worker]; // Chiqib ketdi deb belgilaymiz
+                    delete activeStatusMap[worker]; // Chiqdi deb o'chiramiz
                 }
             });
 
-            // Hozirda shaxta ichida qolib ketganlar (Oxirgi marta faqat KIRISH bo'lganlar)
-            insideCount = Object.keys(activeStatusMap).length;
+            // Hozir ichkarida bo'lgan xodimlar soni
+            const insideCount = Object.keys(activeStatusMap).length;
 
-            // Eng ko'p ishlagan xodimni aniqlash
+            // Eng faol xodim
             let bestWorker = "-";
             let maxHours = -1;
             for (const [name, hours] of Object.entries(workerHours)) {
@@ -222,8 +208,8 @@
                 }
             }
 
-            // Vidjetlarni yangilash
-            document.getElementById('statTotal').innerText = rawData.length;
+            // Statisika paneli yuklash
+            document.getElementById('statTotal').innerText = rows.length - 1;
             document.getElementById('statInside').innerText = insideCount;
             document.getElementById('statHours').innerText = totalHours.toFixed(1) + ' soat';
             document.getElementById('statBest').innerText = bestWorker;
@@ -231,11 +217,10 @@
             document.getElementById('dashboard').classList.remove('hidden');
             document.getElementById('tableContainer').classList.remove('hidden');
 
-            // Loglarni teskari tartibda (oxirgi hodisalar birinchi) jadvalga chiqaramiz
+            // Oxirgi harakatlarni birinchi qilib jadvalga chiqaramiz
             renderTable([...appData].reverse());
         }
 
-        // Jadvalni chizish
         function renderTable(dataList) {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = "";
@@ -266,7 +251,6 @@
             tbody.appendChild(fragment);
         }
 
-        // Qidiruv filtri
         document.getElementById('searchInput').addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
             const filtered = appData.filter(row => 
