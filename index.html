@@ -1,227 +1,200 @@
-import io
-import logging
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
-import polars as pl
-from datetime import datetime
-
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
-
-app = FastAPI(title="SKUD Analytics API", description="API для обработки Excel СКУД")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-def process_dataframe(df: pl.DataFrame) -> pl.DataFrame:
-    """Очистка и вычисление данных с помощью Polars (оптимизировано для 100k+ строк)"""
-    # Приведение названий столбцов к стандартным
-    cols_map = {c: c.strip() for c in df.columns}
-    df = df.rename(cols_map)
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKUD Analytics - Zarmiton & Gujumsoy</title>
     
-    required_cols = ["F.I.SH", "Kirgan vaqt", "Chiqqan vaqt", "Filial", "Eshik", "Sana"]
-    for col in required_cols:
-        if col not in df.columns:
-            raise HTTPException(status_code=400, detail=f"Отсутствует обязательный столбец: {col}")
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    # Обработка времени и статусов
-    # Если 'Chiqqan vaqt' пустое, ставим метку
-    df = df.with_columns(
-        pl.col("Kirgan vaqt").str.strptime(pl.Datetime, "%H:%M:%S", strict=False).alias("kirgan_dt"),
-        pl.col("Chiqqan vaqt").str.strptime(pl.Datetime, "%H:%M:%S", strict=False).alias("chiqqan_dt")
-    )
-    
-    df = df.with_columns(
-        pl.when(pl.col("Chiqqan vaqt").is_null() | (pl.col("Chiqqan vaqt") == ""))
-        .then(pl.lit("CHIQMAGAN"))
-        .otherwise(pl.col("Chiqqan vaqt"))
-        .alias("Status_Chiqqan"),
-        
-        ((pl.col("chiqqan_dt") - pl.col("kirgan_dt")).dt.total_minutes() / 60)
-        .round(2).fill_null(0).alias("Ishlagan_soat")
-    )
-    return df
+    <style>
+        body { transition: background-color 0.3s, color 0.3s; }
+        .dark { background-color: #111827; color: #f9fafb; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <div id="root"></div>
 
-@app.post("/api/upload")
-async def upload_excel(file: UploadFile = File(...)):
-    try:
-        logger.info(f"Получен файл: {file.filename}")
-        content = await file.read()
-        
-        # Чтение Excel через calamine engine (максимальная скорость)
-        df = pl.read_excel(content, engine="calamine")
-        df_processed = process_dataframe(df)
+    <script type="text/babel">
+        const { useState } = React;
 
-        # Вычисление дашборда (Dashboard stats)
-        total_entries = df_processed.height
-        not_exited = df_processed.filter(pl.col("Status_Chiqqan") == "CHIQMAGAN").height
-        total_hours = df_processed["Ishlagan_soat"].sum()
-        avg_hours = df_processed.filter(pl.col("Ishlagan_soat") > 0)["Ishlagan_soat"].mean()
-        
-        best_worker = df_processed.group_by("F.I.SH").agg(pl.col("Ishlagan_soat").sum()).sort("Ishlagan_soat", descending=True).head(1)
-        best_worker_name = best_worker["F.I.SH"][0] if best_worker.height > 0 else "Нет данных"
+        function App() {
+            const [data, setData] = useState([]);
+            const [stats, setStats] = useState(null);
+            const [search, setSearch] = useState("");
+            const [darkMode, setDarkMode] = useState(false);
 
-        # Конвертация в JSON
-        records = df_processed.drop(["kirgan_dt", "chiqqan_dt"]).to_dicts()
+            const toggleTheme = () => {
+                setDarkMode(!darkMode);
+                if (!darkMode) document.body.classList.add('dark');
+                else document.body.classList.remove('dark');
+            };
 
-        return {
-            "dashboard": {
-                "total_entries": total_entries,
-                "not_exited": not_exited,
-                "total_hours": round(total_hours, 2),
-                "avg_hours": round(avg_hours or 0, 2),
-                "best_worker": best_worker_name
-            },
-            "data": records
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const bstr = evt.target.result;
+                    const wb = XLSX.read(bstr, { type: 'binary' });
+                    const wsname = wb.SheetNames[0];
+                    const ws = wb.Sheets[wsname];
+                    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: "" });
+                    processData(jsonData);
+                };
+                reader.readAsBinaryString(file);
+            };
+
+            const processData = (rawData) => {
+                let totalHours = 0;
+                let notExited = 0;
+                const workerHours = {};
+
+                const processed = rawData.map(row => {
+                    let ishlaganSoat = 0;
+                    let status = row["Chiqqan vaqt"];
+
+                    if (!status || status.toString().trim() === "") {
+                        status = "CHIQMAGAN";
+                        notExited++;
+                    } else if (row["Kirgan vaqt"] && row["Chiqqan vaqt"]) {
+                        const parseTime = (t) => {
+                            if (typeof t === 'number') return t * 24; 
+                            const parts = t.toString().split(":");
+                            if (parts.length >= 2) return parseInt(parts[0]) + parseInt(parts[1]) / 60;
+                            return 0;
+                        };
+                        const start = parseTime(row["Kirgan vaqt"]);
+                        const end = parseTime(row["Chiqqan vaqt"]);
+                        if (end >= start) {
+                            ishlaganSoat = parseFloat((end - start).toFixed(2));
+                            totalHours += ishlaganSoat;
+                        }
+                    }
+
+                    const name = row["F.I.SH"] || "Noma'lum";
+                    workerHours[name] = (workerHours[name] || 0) + ishlaganSoat;
+
+                    return { ...row, Status_Chiqqan: status, Ishlagan_soat: ishlaganSoat };
+                });
+
+                let bestWorker = "";
+                let maxHours = -1;
+                for (const [name, hours] of Object.entries(workerHours)) {
+                    if (hours > maxHours) { maxHours = hours; bestWorker = name; }
+                }
+
+                setData(processed);
+                setStats({
+                    total_entries: processed.length,
+                    not_exited: notExited,
+                    total_hours: totalHours.toFixed(2),
+                    best_worker: bestWorker || "Нет данных"
+                });
+            };
+
+            const filteredData = data.filter(r => 
+                (r["F.I.SH"] || "").toLowerCase().includes(search.toLowerCase()) ||
+                (r.Status_Chiqqan === "CHIQMAGAN" && search.toLowerCase() === "chiqmagan")
+            );
+
+            return (
+                <div className="min-h-screen p-6">
+                    <div className="max-w-7xl mx-auto space-y-6">
+                        {/* Шапка */}
+                        <div className="flex justify-between items-center">
+                            <h1 className="text-3xl font-bold">SKUD Zarmiton & Gujumsoy Analytics</h1>
+                            <button onClick={toggleTheme} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                            </button>
+                        </div>
+
+                        {/* Загрузка файла */}
+                        <div className={`p-8 border-2 border-dashed rounded-xl text-center transition-colors ${darkMode ? 'border-gray-600 hover:border-gray-500' : 'border-gray-300 hover:border-gray-400'}`}>
+                            <input 
+                                type="file" 
+                                accept=".xlsx, .xls" 
+                                onChange={handleFileUpload} 
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                            />
+                            <p className="mt-4 text-sm text-gray-400">Выберите Excel файл с колонками: F.I.SH, Kirgan vaqt, Chiqqan vaqt, Filial, Eshik, Sana</p>
+                        </div>
+
+                        {/* Дашборд */}
+                        {stats && (
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                    <h3 className="text-sm text-gray-400">Всего записей</h3>
+                                    <p className="text-2xl font-bold text-blue-500">{stats.total_entries}</p>
+                                </div>
+                                <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                    <h3 className="text-sm text-gray-400">Не вышли (CHIQMAGAN)</h3>
+                                    <p className="text-2xl font-bold text-red-500">{stats.not_exited}</p>
+                                </div>
+                                <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                    <h3 className="text-sm text-gray-400">Всего отработано часов</h3>
+                                    <p className="text-2xl font-bold text-green-500">{stats.total_hours} ч.</p>
+                                </div>
+                                <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                    <h3 className="text-sm text-gray-400">Топ работник</h3>
+                                    <p className="text-xl font-bold text-purple-500">{stats.best_worker}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Таблица */}
+                        {data.length > 0 && (
+                            <div className={`p-4 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                <input 
+                                    type="text" 
+                                    placeholder="Поиск по Ф.И.О или статусу..." 
+                                    value={search} 
+                                    onChange={e => setSearch(e.target.value)} 
+                                    className={`mb-4 p-3 w-full md:w-1/3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`} 
+                                />
+                                
+                                <div className="overflow-auto max-h-[500px]">
+                                    <table className="w-full text-left text-sm border-collapse">
+                                        <thead className={`sticky top-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                            <tr>
+                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">F.I.SH</th>
+                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Sana</th>
+                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Kirgan vaqt</th>
+                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Chiqqan vaqt</th>
+                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Filial</th>
+                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Eshik</th>
+                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Ishlagan soat</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredData.map((row, i) => (
+                                                <tr key={i} className={`border-b transition-colors ${darkMode ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                                    <td className="p-3">{row["F.I.SH"]}</td>
+                                                    <td className="p-3">{row["Sana"]}</td>
+                                                    <td className="p-3">{row["Kirgan vaqt"]}</td>
+                                                    <td className={`p-3 font-medium ${row.Status_Chiqqan === 'CHIQMAGAN' ? 'text-red-500' : ''}`}>{row.Status_Chiqqan}</td>
+                                                    <td className="p-3">{row["Filial"]}</td>
+                                                    <td className="p-3">{row["Eshik"]}</td>
+                                                    <td className="p-3 font-semibold">{row.Ishlagan_soat}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
         }
-    except Exception as e:
-        logger.error(f"Ошибка обработки: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-        {
-  "dependencies": {
-    "axios": "^1.6.0",
-    "lucide-react": "^0.292.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-dropzone": "^14.2.3",
-    "recharts": "^2.10.0"
-  }
-}import React, { useState, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
-import axios from 'axios';
-import { Moon, Sun, UploadCloud, Download, AlertCircle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function App() {
-  const [darkMode, setDarkMode] = useState(false);
-  const [data, setData] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
-
-  const toggleTheme = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle('dark');
-  };
-
-  const onDrop = useCallback(async (acceptedFiles) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
-
-    setLoading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await axios.post("http://localhost:8000/api/upload", formData);
-      setData(response.data.data);
-      setStats(response.data.dashboard);
-    } catch (error) {
-      alert("Ошибка при обработке файла: " + (error.response?.data?.detail || error.message));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } });
-
-  const filteredData = data.filter(row => 
-    row["F.I.SH"].toLowerCase().includes(search.toLowerCase()) || 
-    row["Status_Chiqqan"] === "CHIQMAGAN" && search.toLowerCase() === "chiqmagan"
-  );
-
-  return (
-    <div className={`min-h-screen p-6 transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">SKUD Analytics Pro</h1>
-          <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-            {darkMode ? <Sun /> : <Moon />}
-          </button>
-        </div>
-
-        {/* Drag & Drop Zone */}
-        <div {...getRootProps()} className={`border-2 border-dashed p-10 rounded-xl text-center cursor-pointer transition-colors ${isDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900' : 'border-gray-300 dark:border-gray-600'}`}>
-          <input {...getInputProps()} />
-          <UploadCloud className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-lg">{isDragActive ? "Отпустите файл здесь..." : "Перетащите Excel (.xlsx) файл сюда или кликните для выбора"}</p>
-          {loading && <p className="text-blue-500 font-bold mt-2">Обработка файла (Multithreading)...</p>}
-        </div>
-
-        {/* Dashboard */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <StatCard title="Всего входов" value={stats.total_entries} dark={darkMode} />
-            <StatCard title="Не вышли (CHIQMAGAN)" value={stats.not_exited} color="text-red-500" dark={darkMode} />
-            <StatCard title="Всего часов работы" value={stats.total_hours} dark={darkMode} />
-            <StatCard title="Топ работник" value={stats.best_worker} dark={darkMode} />
-          </div>
-        )}
-
-        {/* Table & Filters */}
-        {data.length > 0 && (
-          <div className={`p-4 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className="flex justify-between mb-4">
-              <input 
-                type="text" 
-                placeholder="Поиск по Ф.И.О..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className={`p-2 border rounded-lg w-1/3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white'}`}
-              />
-              <div className="space-x-2">
-                <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"><Download size={16}/> Excel</button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto h-96">
-              <table className="w-full text-left text-sm">
-                <thead className={`sticky top-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                  <tr>
-                    <th className="p-3">F.I.SH</th>
-                    <th className="p-3">Sana</th>
-                    <th className="p-3">Kirgan vaqt</th>
-                    <th className="p-3">Chiqqan vaqt</th>
-                    <th className="p-3">Eshik</th>
-                    <th className="p-3">Ishlagan soat</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredData.map((row, idx) => (
-                    <tr key={idx} className={`border-b ${darkMode ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'}`}>
-                      <td className="p-3">{row["F.I.SH"]}</td>
-                      <td className="p-3">{row["Sana"]}</td>
-                      <td className="p-3">{row["Kirgan vaqt"]}</td>
-                      <td className="p-3 font-bold">
-                        {row["Status_Chiqqan"] === "CHIQMAGAN" ? <span className="text-red-500 flex items-center gap-1"><AlertCircle size={14}/> CHIQMAGAN</span> : row["Status_Chiqqan"]}
-                      </td>
-                      <td className="p-3">{row["Eshik"]}</td>
-                      <td className="p-3">{row["Ishlagan_soat"]} ч.</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ title, value, color = "text-blue-500", dark }) {
-  return (
-    <div className={`p-6 rounded-xl shadow-sm ${dark ? 'bg-gray-800' : 'bg-white'}`}>
-      <h3 className="text-gray-500 dark:text-gray-400 text-sm font-medium">{title}</h3>
-      <p className={`text-2xl font-bold mt-2 ${color}`}>{value}</p>
-    </div>
-  );
-}
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
