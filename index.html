@@ -1,213 +1,34 @@
-<!DOCTYPE html>
-<html lang="uz">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>СКУД - Ишчиларни Фильтрлаш</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-</head>
-<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-6">
-
-    <div class="max-w-6xl mx-auto">
-        <div class="flex items-center justify-between border-b border-gray-800 pb-5 mb-6">
-            <div class="flex items-center space-x-3">
-                <span class="text-3xl">📊</span>
-                <h1 class="text-2xl font-bold tracking-tight text-white">СКУД Тизими: Ишчиларни Саралаш (Зармитан / Gujumsoy)</h1>
-            </div>
-            <span class="bg-blue-500/10 text-blue-400 text-xs px-2.5 py-1 rounded-full font-mono border border-blue-500/20">v2.0 (Raw Time)</span>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 flex flex-col justify-between">
-                <label class="block text-sm font-medium text-gray-400 mb-2">Excel файлни танланг:</label>
-                <input type="file" id="fileInput" accept=".xlsx, .xls" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" />
-            </div>
-
-            <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 flex flex-col justify-between">
-                <label class="block text-sm font-medium text-gray-400 mb-2">Минимал иш соатидан камлар:</label>
-                <input type="number" id="hoursInput" value="8" min="1" max="24" step="0.5" class="block w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500" />
-            </div>
-
-            <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 flex items-end space-x-3">
-                <button onclick="filterData()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition active:scale-95 shadow-lg shadow-blue-600/10 flex items-center justify-center space-x-2 cursor-pointer">
-                    <span>🔍 Фильтрлашни бошлаш</span>
-                </button>
-                <button onclick="downloadFiltered()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition active:scale-95 shadow-lg shadow-emerald-600/10 flex items-center justify-center cursor-pointer" title="Натижани Excel қилиб юклаб олиш">
-                    <span>📥 Excel Юклаш</span>
-                </button>
-            </div>
-        </div>
-
-        <div id="statsPanel" class="hidden mb-4 p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-sm font-medium flex justify-between">
-            <span>Жами ходимлар: <span id="totalCount" class="font-bold">0</span> та.</span>
-            <span>Кам ишлаганлар: <span id="badCount" class="font-bold text-red-400">0</span> та.</span>
-        </div>
-
-        <div class="bg-gray-800/30 rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-800/80 text-gray-300 border-b border-gray-700 text-sm font-semibold">
-                            <th class="p-3.5">ИД</th>
-                            <th class="p-3.5">Ф.И.Ш. (Person Name)</th>
-                            <th class="p-3.5">Биринчи кириш</th>
-                            <th class="p-3.5">Охирги чиқиш</th>
-                            <th class="p-3.5">Жами соат</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody" class="divide-y divide-gray-800/50 text-sm">
-                        <tr>
-                            <td colspan="5" class="p-12 text-center text-gray-500 italic">Маълумот кўриш учун аввал Excel файл юкланг ва фильтрланг...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 col-span-2">
+        <label class="block text-sm font-medium text-gray-400 mb-2">Excel файлни танланг:</label>
+        <input type="file" id="fileInput" accept=".xlsx, .xls" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:bg-blue-600 file:text-white cursor-pointer" />
     </div>
 
-    <script>
-        let excelData = [];
-        let processedWorkers = [];
-        let globalFilteredData = [];
+    <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 flex items-end">
+        <button onclick="processFile()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition active:scale-95">
+            ✅ Тасдиқлаш
+        </button>
+    </div>
 
-        // Поиск колонки по возможным названиям
-        function findValue(row, keys) {
-            for (let key of Object.keys(row)) {
-                const normalizedKey = key.toString().toLowerCase().trim();
-                if (keys.some(k => normalizedKey.includes(k))) return row[key];
-            }
-            return null;
+    <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 flex items-end">
+        <button id="filterBtn" onclick="filterData()" disabled class="w-full bg-blue-600 opacity-50 cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition active:scale-95">
+            🔍 Фильтрлаш
+        </button>
+    </div>
+</div>
+
+<script>
+    // Файлни тасдиқлаш функцияси
+    function processFile() {
+        if (excelData.length === 0) {
+            alert("Аввал файлни танланг!");
+            return;
         }
-
-        // Чтение Excel
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    
-                    // raw: false заставляет библиотеку читать даты как текст (как в вашем файле: "2026-05-24 20:36:08")
-                    excelData = XLSX.utils.sheet_to_json(worksheet, {raw: false});
-                    alert("Excel юкланди! Энди фильтрни босинг.");
-                } catch (error) {
-                    alert("Файлни ўқишда хатолик.");
-                    console.error(error);
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        });
-
-        // Основная логика: расчет часов и фильтрация
-        function filterData() {
-            if (excelData.length === 0) {
-                alert("Илтимос, аввал Excel файлни юкланг!");
-                return;
-            }
-
-            const targetHours = parseFloat(document.getElementById('hoursInput').value) || 8;
-            let workersMap = {};
-
-            // 1. Группируем данные по сотрудникам
-            excelData.forEach(row => {
-                const name = findValue(row, ['person name', 'имя', 'фио', 'ходим']);
-                const timeStr = findValue(row, ['time', 'время', 'вақт']);
-                const id = findValue(row, ['id', 'табель']);
-
-                // Пропускаем пустые строки или "Stranger (Face)"
-                if (!name || name.trim() === '' || name.toLowerCase().includes('stranger')) return;
-                if (!timeStr) return;
-
-                const dateObj = new Date(timeStr);
-                if (isNaN(dateObj.getTime())) return;
-
-                if (!workersMap[name]) {
-                    workersMap[name] = {
-                        id: id || '-',
-                        name: name,
-                        minTime: dateObj,
-                        maxTime: dateObj
-                    };
-                } else {
-                    if (dateObj < workersMap[name].minTime) workersMap[name].minTime = dateObj;
-                    if (dateObj > workersMap[name].maxTime) workersMap[name].maxTime = dateObj;
-                }
-            });
-
-            processedWorkers = [];
-            globalFilteredData = [];
-
-            // 2. Считаем разницу в часах
-            Object.values(workersMap).forEach(worker => {
-                const diffMs = worker.maxTime - worker.minTime;
-                const hours = diffMs / (1000 * 60 * 60);
-
-                const workerData = {
-                    ID: worker.id,
-                    Исм: worker.name,
-                    Кириш: worker.minTime.toLocaleString('ru-RU'),
-                    Чикиш: worker.maxTime.toLocaleString('ru-RU'),
-                    Соат: parseFloat(hours.toFixed(2))
-                };
-
-                processedWorkers.push(workerData);
-
-                // Если часов меньше нормы, добавляем в отфильтрованный список
-                if (hours < targetHours) {
-                    globalFilteredData.push(workerData);
-                }
-            });
-
-            // 3. Вывод на экран
-            document.getElementById('statsPanel').classList.remove('hidden');
-            document.getElementById('totalCount').innerText = processedWorkers.length;
-            document.getElementById('badCount').innerText = globalFilteredData.length;
-
-            renderTable(globalFilteredData);
-        }
-
-        // Отрисовка таблицы
-        function renderTable(data) {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-emerald-400 italic font-medium">Барча ходимлар нормани бажарган! 👍</td></tr>';
-                return;
-            }
-
-            data.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-800/40 transition text-gray-300 border-b border-gray-800/50";
-                
-                tr.innerHTML = `
-                    <td class="p-3 font-mono text-gray-400">${row.ID}</td>
-                    <td class="p-3 font-medium text-white">${row.Исм}</td>
-                    <td class="p-3 text-gray-400">${row.Кириш}</td>
-                    <td class="p-3 text-gray-400">${row.Чикиш}</td>
-                    <td class="p-3"><span class="bg-gray-800 px-2.5 py-1 rounded text-red-400 font-mono font-semibold">${row.Соат} соат</span></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // Экспорт в Excel
-        function downloadFiltered() {
-            if (globalFilteredData.length === 0) {
-                alert("Юклаб олиш учун маълумот йўқ!");
-                return;
-            }
-            const worksheet = XLSX.utils.json_to_sheet(globalFilteredData);
-            const workbook = XLSX.utils.book_new();
-            XLSX.book_append_sheet(workbook, worksheet, "Кам ишлаганлар");
-            XLSX.writeFile(workbook, "Zarmiton_Kam_ishlaganlar.xlsx");
-        }
-    </script>
-</body>
-</html>
+        document.getElementById('filterBtn').disabled = false;
+        document.getElementById('filterBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+        alert("Маълумотлар тасдиқланди. Энди фильтрлашни босинг.");
+    }
+    
+    // filterData функцияси ичига қўшимча равишда экспорт тугмасини ҳам қўшишингиз мумкин
+    // ... қолган қисми аввалгидек ...
+</script>
