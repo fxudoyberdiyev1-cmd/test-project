@@ -4,196 +4,203 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SKUD Analytics - Zarmiton & Gujumsoy</title>
-    
+    <link rel="icon" href="data:,">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-    <style>
-        body { transition: background-color 0.3s, color 0.3s; }
-        .dark { background-color: #111827; color: #f9fafb; }
-    </style>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
 </head>
-<body class="bg-gray-50 text-gray-900">
-    <div id="root"></div>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div class="max-w-7xl mx-auto p-6 space-y-6">
+        
+        <div class="flex justify-between items-center">
+            <h1 class="text-3xl font-bold tracking-tight">SKUD Zarmiton & Gujumsoy Analytics</h1>
+            <button id="themeToggle" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow transition-all">
+                🌙 Dark Mode
+            </button>
+        </div>
 
-    <script type="text/babel">
-        const { useState } = React;
+        <div id="dropzone" class="p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-center bg-white dark:bg-gray-800 cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-colors">
+            <input type="file" id="fileInput" accept=".xlsx, .xls" class="hidden">
+            <div class="space-y-2">
+                <p class="text-lg font-medium">Перетащите Excel-файл сюда или нажмите для выбора</p>
+                <p class="text-sm text-gray-400">Обязательные колонки: F.I.SH, Kirgan vaqt, Chiqqan vaqt, Filial, Eshik, Sana</p>
+            </div>
+        </div>
 
-        function App() {
-            const [data, setData] = useState([]);
-            const [stats, setStats] = useState(null);
-            const [search, setSearch] = useState("");
-            const [darkMode, setDarkMode] = useState(false);
+        <div id="dashboard" class="hidden grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-medium text-gray-400">Всего записей</h3>
+                <p id="statTotal" class="text-2xl font-bold text-blue-500 mt-1">0</p>
+            </div>
+            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-medium text-gray-400">Не вышли (CHIQMAGAN)</h3>
+                <p id="statNotExited" class="text-2xl font-bold text-red-500 mt-1">0</p>
+            </div>
+            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-medium text-gray-400">Отработано часов</h3>
+                <p id="statHours" class="text-2xl font-bold text-green-500 mt-1">0</p>
+            </div>
+            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 class="text-sm font-medium text-gray-400">Топ работник</h3>
+                <p id="statBest" class="text-xl font-bold text-purple-500 mt-1 truncate">-</p>
+            </div>
+        </div>
 
-            const toggleTheme = () => {
-                setDarkMode(!darkMode);
-                if (!darkMode) document.body.classList.add('dark');
-                else document.body.classList.remove('dark');
+        <div id="tableContainer" class="hidden p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+            <div class="flex flex-col md:flex-row gap-4 justify-between items-center">
+                <input type="text" id="searchInput" placeholder="Поиск по Ф.И.О. или статусу (например: chiqmagan)..." class="p-2.5 w-full md:w-1/3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div class="overflow-x-auto max-h-[500px] rounded-lg border border-gray-200 dark:border-gray-700">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead class="sticky top-0 bg-gray-100 dark:bg-gray-700 font-semibold text-gray-700 dark:text-gray-200 shadow-sm">
+                        <tr>
+                            <th class="p-3">F.I.SH</th>
+                            <th class="p-3">Sana</th>
+                            <th class="p-3">Kirgan vaqt</th>
+                            <th class="p-3">Chiqqan vaqt</th>
+                            <th class="p-3">Filial</th>
+                            <th class="p-3">Eshik</th>
+                            <th class="p-3">Ishlagan soat</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let appData = [];
+
+        // Переключение Темы
+        const themeToggle = document.getElementById('themeToggle');
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            themeToggle.innerText = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        });
+
+        // Работа с файлами
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('border-blue-500'); });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-blue-500'));
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-blue-500');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                processData(json);
             };
-
-            const handleFileUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    const bstr = evt.target.result;
-                    const wb = XLSX.read(bstr, { type: 'binary' });
-                    const wsname = wb.SheetNames[0];
-                    const ws = wb.Sheets[wsname];
-                    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: "" });
-                    processData(jsonData);
-                };
-                reader.readAsBinaryString(file);
-            };
-
-            const processData = (rawData) => {
-                let totalHours = 0;
-                let notExited = 0;
-                const workerHours = {};
-
-                const processed = rawData.map(row => {
-                    let ishlaganSoat = 0;
-                    let status = row["Chiqqan vaqt"];
-
-                    if (!status || status.toString().trim() === "") {
-                        status = "CHIQMAGAN";
-                        notExited++;
-                    } else if (row["Kirgan vaqt"] && row["Chiqqan vaqt"]) {
-                        // Конвертация времени Excel в часы
-                        const parseTime = (t) => {
-                            if (typeof t === 'number') return t * 24; 
-                            const parts = t.toString().split(":");
-                            if (parts.length >= 2) return parseInt(parts[0]) + parseInt(parts[1]) / 60;
-                            return 0;
-                        };
-                        const start = parseTime(row["Kirgan vaqt"]);
-                        const end = parseTime(row["Chiqqan vaqt"]);
-                        if (end >= start) {
-                            ishlaganSoat = parseFloat((end - start).toFixed(2));
-                            totalHours += ishlaganSoat;
-                        }
-                    }
-
-                    const name = row["F.I.SH"] || "Noma'lum";
-                    workerHours[name] = (workerHours[name] || 0) + ishlaganSoat;
-
-                    return { ...row, Status_Chiqqan: status, Ishlagan_soat: ishlaganSoat };
-                });
-
-                // Поиск лучшего работника
-                let bestWorker = "";
-                let maxHours = -1;
-                for (const [name, hours] of Object.entries(workerHours)) {
-                    if (hours > maxHours) { maxHours = hours; bestWorker = name; }
-                }
-
-                setData(processed);
-                setStats({
-                    total_entries: processed.length,
-                    not_exited: notExited,
-                    total_hours: totalHours.toFixed(2),
-                    best_worker: bestWorker || "Нет данных"
-                });
-            };
-
-            const filteredData = data.filter(r => 
-                (r["F.I.SH"] || "").toLowerCase().includes(search.toLowerCase()) ||
-                (r.Status_Chiqqan === "CHIQMAGAN" && search.toLowerCase() === "chiqmagan")
-            );
-
-            return (
-                <div className="min-h-screen p-6">
-                    <div className="max-w-7xl mx-auto space-y-6">
-                        
-                        <div className="flex justify-between items-center">
-                            <h1 className="text-3xl font-bold">SKUD Zarmiton & Gujumsoy Analytics</h1>
-                            <button onClick={toggleTheme} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-                            </button>
-                        </div>
-
-                        <div className={`p-8 border-2 border-dashed rounded-xl text-center transition-colors ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>
-                            <input 
-                                type="file" 
-                                accept=".xlsx, .xls" 
-                                onChange={handleFileUpload} 
-                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                            />
-                            <p className="mt-4 text-sm text-gray-400">Выберите Excel файл (.xlsx)</p>
-                        </div>
-
-                        {stats && (
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                                    <h3 className="text-sm text-gray-400">Всего записей</h3>
-                                    <p className="text-2xl font-bold text-blue-500">{stats.total_entries}</p>
-                                </div>
-                                <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                                    <h3 className="text-sm text-gray-400">Не вышли (CHIQMAGAN)</h3>
-                                    <p className="text-2xl font-bold text-red-500">{stats.not_exited}</p>
-                                </div>
-                                <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                                    <h3 className="text-sm text-gray-400">Всего отработано часов</h3>
-                                    <p className="text-2xl font-bold text-green-500">{stats.total_hours} ч.</p>
-                                </div>
-                                <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                                    <h3 className="text-sm text-gray-400">Топ работник</h3>
-                                    <p className="text-xl font-bold text-purple-500">{stats.best_worker}</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {data.length > 0 && (
-                            <div className={`p-4 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Поиск по Ф.И.О или статусу..." 
-                                    value={search} 
-                                    onChange={e => setSearch(e.target.value)} 
-                                    className={`mb-4 p-3 w-full md:w-1/3 border rounded-lg focus:outline-none ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`} 
-                                />
-                                
-                                <div className="overflow-auto max-h-[500px]">
-                                    <table className="w-full text-left text-sm border-collapse">
-                                        <thead className={`sticky top-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                                            <tr>
-                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">F.I.SH</th>
-                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Sana</th>
-                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Kirgan vaqt</th>
-                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Chiqqan vaqt</th>
-                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Filial</th>
-                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Eshik</th>
-                                                <th className="p-3 border-b border-gray-200 dark:border-gray-700">Ishlagan soat</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredData.map((row, i) => (
-                                                <tr key={i} className={`border-b transition-colors ${darkMode ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'}`}>
-                                                    <td className="p-3">{row["F.I.SH"]}</td>
-                                                    <td className="p-3">{row["Sana"]}</td>
-                                                    <td className="p-3">{row["Kirgan vaqt"]}</td>
-                                                    <td className={`p-3 font-medium ${row.Status_Chiqqan === 'CHIQMAGAN' ? 'text-red-500' : ''}`}>{row.Status_Chiqqan}</td>
-                                                    <td className="p-3">{row["Filial"]}</td>
-                                                    <td className="p-3">{row["Eshik"]}</td>
-                                                    <td className="p-3 font-semibold">{row.Ishlagan_soat}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
+            reader.readAsArrayBuffer(file);
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // Анализ данных
+        function processData(rawData) {
+            let totalHours = 0;
+            let notExited = 0;
+            const workerHours = {};
+
+            appData = rawData.map(row => {
+                let ishlaganSoat = 0;
+                let status = row["Chiqqan vaqt"] ? row["Chiqqan vaqt"].toString().trim() : "";
+
+                if (status === "") {
+                    status = "CHIQMAGAN";
+                    notExited++;
+                } else if (row["Kirgan vaqt"]) {
+                    const parseTime = (t) => {
+                        if (typeof t === 'number') return t * 24;
+                        const parts = t.toString().split(":");
+                        return parts.length >= 2 ? parseInt(parts[0]) + parseInt(parts[1]) / 60 : 0;
+                    };
+                    const start = parseTime(row["Kirgan vaqt"]);
+                    const end = parseTime(status);
+                    if (end >= start) {
+                        ishlaganSoat = parseFloat((end - start).toFixed(2));
+                        totalHours += ishlaganSoat;
+                    }
+                }
+
+                const name = row["F.I.SH"] || "Noma'lum";
+                workerHours[name] = (workerHours[name] || 0) + ishlaganSoat;
+
+                return {
+                    fish: name,
+                    sana: row["Sana"] || "-",
+                    kirgan: row["Kirgan vaqt"] || "-",
+                    chiqqan: status,
+                    filial: row["Filial"] || "-",
+                    eshik: row["Eshik"] || "-",
+                    hours: ishlaganSoat
+                };
+            });
+
+            let bestWorker = "-";
+            let maxHours = -1;
+            for (const [name, hours] of Object.entries(workerHours)) {
+                if (hours > maxHours) { maxHours = hours; bestWorker = name; }
+            }
+
+            // Обновление интерфейса
+            document.getElementById('statTotal').innerText = appData.length;
+            document.getElementById('statNotExited').innerText = notExited;
+            document.getElementById('statHours').innerText = totalHours.toFixed(2) + ' ч.';
+            document.getElementById('statBest').innerText = bestWorker;
+
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('tableContainer').classList.remove('hidden');
+
+            renderTable(appData);
+        }
+
+        // Оптимизированный рендеринг таблицы (через DocumentFragment)
+        function renderTable(dataList) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = "";
+
+            const fragment = document.createDocumentFragment();
+            dataList.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors";
+                const isChiqmagan = row.chiqqan === "CHIQMAGAN";
+                
+                tr.innerHTML = `
+                    <td class="p-3 font-medium">${row.fish}</td>
+                    <td class="p-3">${row.sana}</td>
+                    <td class="p-3">${row.kirgan}</td>
+                    <td class="p-3 font-semibold ${isChiqmagan ? 'text-red-500' : ''}">${row.chiqqan}</td>
+                    <td class="p-3">${row.filial}</td>
+                    <td class="p-3">${row.eshik}</td>
+                    <td class="p-3 font-semibold">${row.hours} ч.</td>
+                `;
+                fragment.appendChild(tr);
+            });
+            tbody.appendChild(fragment);
+        }
+
+        // Поиск/Фильтрация
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = appData.filter(row => 
+                row.fish.toLowerCase().includes(query) || 
+                row.chiqqan.toLowerCase().includes(query)
+            );
+            renderTable(filtered);
+        });
     </script>
 </body>
 </html>
