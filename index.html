@@ -75,7 +75,7 @@
     <script>
         let appData = [];
 
-        // Tungi rejim tugmasi
+        // Tungi rejim
         const themeToggle = document.getElementById('themeToggle');
         themeToggle.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
@@ -147,7 +147,7 @@
                     const deviceStr = row[idxDevice] ? row[idxDevice].toString() : "";
                     const doorStr = row[idxDoor] ? row[idxDoor].toString() : "";
                     let direction = "KIRISH";
-                    if (deviceStr.includes("Выход") || deviceStr.includes("Chiqish") || doorStr.includes("Чиқиш") || doorStr.includes("Выход")) {
+                    if (deviceStr.includes("Выход") || deviceStr.includes("Chiqish") || doorStr.includes("Чиқиш") || doorStr.includes("Выход") || doorStr.includes("Чилиш")) {
                         direction = "CHIQISH";
                     }
                     return {
