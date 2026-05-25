@@ -25,9 +25,11 @@
             <input type="file" id="fileInput" accept=".xlsx, .xls" class="hidden">
             <div class="space-y-2">
                 <p class="text-lg font-medium">Перетащите Excel-файл сюда или нажмите для выбора</p>
-                <p class="text-sm text-gray-400">Обязательные колонки: F.I.SH, Kirgan vaqt, Chiqqan vaqt, Filial, Eshik, Sana</p>
+                <p class="text-sm text-gray-400">Kutilayotgan ustunlar: F.I.SH, Kirgan vaqt, Chiqqan vaqt, Filial, Eshik, Sana</p>
             </div>
         </div>
+
+        <div id="errorAlert" class="hidden p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl font-medium"></div>
 
         <div id="dashboard" class="hidden grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -74,17 +76,17 @@
     <script>
         let appData = [];
 
-        // Переключение Темы
+        // Тема
         const themeToggle = document.getElementById('themeToggle');
         themeToggle.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
-            const isDark = document.documentElement.classList.contains('dark');
-            themeToggle.innerText = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+            themeToggle.innerText = document.documentElement.classList.contains('dark') ? '☀️ Light Mode' : '🌙 Dark Mode';
         });
 
-        // Работа с файлами
+        // Файл юклаш
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('fileInput');
+        const errorAlert = document.getElementById('errorAlert');
 
         dropzone.addEventListener('click', () => fileInput.click());
         dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('border-blue-500'); });
@@ -96,38 +98,73 @@
         });
         fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
 
+        function showError(msg) {
+            errorAlert.innerText = msg;
+            errorAlert.classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('tableContainer').classList.add('hidden');
+        }
+
         function handleFile(file) {
+            errorAlert.classList.add('hidden');
             const reader = new FileReader();
             reader.onload = (e) => {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-                processData(json);
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    
+                    if(json.length === 0) {
+                        showError("Xatolik: Excel fayli bo'sh!");
+                        return;
+                    }
+                    processData(json);
+                } catch (err) {
+                    showError("Faylni o'qishda xatolik yuz berdi: " + err.message);
+                }
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // Анализ данных
+        // Ma'lumotlarni qayta ishlash
         function processData(rawData) {
             let totalHours = 0;
             let notExited = 0;
             const workerHours = {};
 
+            // Kalitlarni normallashtirish (probel va harf kattaligini to'g'rilash)
+            const sample = rawData[0];
+            const findKey = (name) => {
+                return Object.keys(sample).find(k => k.toLowerCase().replace(/[^a-z.a-z0-9]/g, '') === name.toLowerCase().replace(/[^a-z.a-z0-9]/g, '')) || null;
+            };
+
+            const keyFish = findKey("F.I.SH") || findKey("FISH") || findKey("ФИО");
+            const keyKirgan = findKey("Kirgan vaqt") || findKey("Kirish");
+            const keyChiqqan = findKey("Chiqqan vaqt") || findKey("Chiqish");
+            const keySana = findKey("Sana") || findKey("Data");
+            const keyFilial = findKey("Filial");
+            const keyEshik = findKey("Eshik");
+
+            if (!keyFish || !keyKirgan || !keyChiqqan) {
+                showError("Xatolik: Excel faylida majburiy ustunlar topilmadi! Ustun nomlarini tekshiring (F.I.SH, Kirgan vaqt, Chiqqan vaqt).");
+                return;
+            }
+
             appData = rawData.map(row => {
                 let ishlaganSoat = 0;
-                let status = row["Chiqqan vaqt"] ? row["Chiqqan vaqt"].toString().trim() : "";
+                let status = row[keyChiqqan] ? row[keyChiqqan].toString().trim() : "";
 
                 if (status === "") {
                     status = "CHIQMAGAN";
                     notExited++;
-                } else if (row["Kirgan vaqt"]) {
+                } else if (row[keyKirgan]) {
                     const parseTime = (t) => {
                         if (typeof t === 'number') return t * 24;
                         const parts = t.toString().split(":");
                         return parts.length >= 2 ? parseInt(parts[0]) + parseInt(parts[1]) / 60 : 0;
                     };
-                    const start = parseTime(row["Kirgan vaqt"]);
+                    const start = parseTime(row[keyKirgan]);
                     const end = parseTime(status);
                     if (end >= start) {
                         ishlaganSoat = parseFloat((end - start).toFixed(2));
@@ -135,16 +172,16 @@
                     }
                 }
 
-                const name = row["F.I.SH"] || "Noma'lum";
+                const name = row[keyFish] || "Noma'lum";
                 workerHours[name] = (workerHours[name] || 0) + ishlaganSoat;
 
                 return {
                     fish: name,
-                    sana: row["Sana"] || "-",
-                    kirgan: row["Kirgan vaqt"] || "-",
+                    sana: row[keySana] || "-",
+                    kirgan: row[keyKirgan] || "-",
                     chiqqan: status,
-                    filial: row["Filial"] || "-",
-                    eshik: row["Eshik"] || "-",
+                    filial: row[keyFilial] || "-",
+                    eshik: row[keyEshik] || "-",
                     hours: ishlaganSoat
                 };
             });
@@ -155,7 +192,6 @@
                 if (hours > maxHours) { maxHours = hours; bestWorker = name; }
             }
 
-            // Обновление интерфейса
             document.getElementById('statTotal').innerText = appData.length;
             document.getElementById('statNotExited').innerText = notExited;
             document.getElementById('statHours').innerText = totalHours.toFixed(2) + ' ч.';
@@ -167,12 +203,11 @@
             renderTable(appData);
         }
 
-        // Оптимизированный рендеринг таблицы (через DocumentFragment)
         function renderTable(dataList) {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = "";
-
             const fragment = document.createDocumentFragment();
+
             dataList.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.className = "border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors";
@@ -192,7 +227,6 @@
             tbody.appendChild(fragment);
         }
 
-        // Поиск/Фильтрация
         document.getElementById('searchInput').addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
             const filtered = appData.filter(row => 
