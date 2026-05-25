@@ -63,6 +63,7 @@
                         status = "CHIQMAGAN";
                         notExited++;
                     } else if (row["Kirgan vaqt"] && row["Chiqqan vaqt"]) {
+                        // Конвертация времени Excel в часы
                         const parseTime = (t) => {
                             if (typeof t === 'number') return t * 24; 
                             const parts = t.toString().split(":");
@@ -83,6 +84,7 @@
                     return { ...row, Status_Chiqqan: status, Ishlagan_soat: ishlaganSoat };
                 });
 
+                // Поиск лучшего работника
                 let bestWorker = "";
                 let maxHours = -1;
                 for (const [name, hours] of Object.entries(workerHours)) {
@@ -106,7 +108,7 @@
             return (
                 <div className="min-h-screen p-6">
                     <div className="max-w-7xl mx-auto space-y-6">
-                        {/* Шапка */}
+                        
                         <div className="flex justify-between items-center">
                             <h1 className="text-3xl font-bold">SKUD Zarmiton & Gujumsoy Analytics</h1>
                             <button onClick={toggleTheme} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
@@ -114,18 +116,16 @@
                             </button>
                         </div>
 
-                        {/* Загрузка файла */}
-                        <div className={`p-8 border-2 border-dashed rounded-xl text-center transition-colors ${darkMode ? 'border-gray-600 hover:border-gray-500' : 'border-gray-300 hover:border-gray-400'}`}>
+                        <div className={`p-8 border-2 border-dashed rounded-xl text-center transition-colors ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>
                             <input 
                                 type="file" 
                                 accept=".xlsx, .xls" 
                                 onChange={handleFileUpload} 
                                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                             />
-                            <p className="mt-4 text-sm text-gray-400">Выберите Excel файл с колонками: F.I.SH, Kirgan vaqt, Chiqqan vaqt, Filial, Eshik, Sana</p>
+                            <p className="mt-4 text-sm text-gray-400">Выберите Excel файл (.xlsx)</p>
                         </div>
 
-                        {/* Дашборд */}
                         {stats && (
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div className={`p-6 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -147,7 +147,6 @@
                             </div>
                         )}
 
-                        {/* Таблица */}
                         {data.length > 0 && (
                             <div className={`p-4 rounded-xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                                 <input 
@@ -155,7 +154,7 @@
                                     placeholder="Поиск по Ф.И.О или статусу..." 
                                     value={search} 
                                     onChange={e => setSearch(e.target.value)} 
-                                    className={`mb-4 p-3 w-full md:w-1/3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`} 
+                                    className={`mb-4 p-3 w-full md:w-1/3 border rounded-lg focus:outline-none ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`} 
                                 />
                                 
                                 <div className="overflow-auto max-h-[500px]">
