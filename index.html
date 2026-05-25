@@ -3,84 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SKUD Analitika - Zarmiton & Gujumsoy</title>
-    <link rel="icon" href="data:,">
+    <title>SKUD Analitika Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script>
-        tailwind.config = { darkMode: 'class' }
-    </script>
 </head>
-<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
-    <div class="max-w-7xl mx-auto p-6 space-y-6">
+<body class="bg-gray-900 text-gray-100 font-sans p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
         
-        <div class="flex justify-between items-center">
-            <div class="space-y-1">
-                <h1 class="text-3xl font-bold tracking-tight">SKUD Zarmiton & Gujumsoy</h1>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Konchilik monitoringi va SKUD tizimi tahlili</p>
-            </div>
-            <button id="themeToggle" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow transition-all">
-                🌙 Tungi rejim
-            </button>
+        <div class="border-b border-gray-800 pb-4">
+            <h1 class="text-3xl font-extrabold text-blue-500">SKUD Monitoring Tizimi</h1>
+            <p class="text-gray-400 text-sm mt-1">Obyektlar bo'yicha Kirish-Chiqish va ish vaqti tahlili (Zarmiton & Gujumsoy)</p>
         </div>
 
-        <div id="dropzone" class="p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-center bg-white dark:bg-gray-800 cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-colors">
+        <div id="dropzone" class="p-8 border-2 border-dashed border-gray-700 rounded-xl text-center bg-gray-800 cursor-pointer hover:border-blue-500 transition-colors">
             <input type="file" id="fileInput" accept=".xlsx, .xls" class="hidden">
-            <div class="space-y-2">
-                <p class="text-lg font-medium">Excel faylni bu yerga tashlang yoki tanlash uchun bosing</p>
-                <p class="text-sm text-gray-400">Tizim (Time, Device, Door, Person Name) ustunlarini avtomat tahlil qiladi</p>
+            <p class="text-lg font-medium text-gray-300">Excel faylni bu yerga tashlang yoki bosib yuklang</p>
+            <p class="text-xs text-gray-500 mt-1">Tizim avtomatik ravishda Kirish va Chiqish vaqtlarini obyektlar kesimida bog'laydi</p>
+        </div>
+
+        <div id="errorAlert" class="hidden p-4 bg-red-900/50 border border-red-700 text-red-200 rounded-xl font-medium"></div>
+
+        <div id="dashboard" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="p-5 bg-gray-800 rounded-xl border border-gray-750">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Jami qaydlar (Loglar)</h3>
+                <p id="statTotal" class="text-2xl font-bold text-blue-400 mt-1">0</p>
+            </div>
+            <div class="p-5 bg-gray-800 rounded-xl border border-gray-750">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tahlil qilingan xodimlar</h3>
+                <p id="statWorkers" class="text-2xl font-bold text-teal-400 mt-1">0</p>
+            </div>
+            <div class="p-5 bg-gray-800 rounded-xl border border-gray-750">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Umumiy ish soati</h3>
+                <p id="statHours" class="text-2xl font-bold text-green-400 mt-1">0</p>
             </div>
         </div>
 
-        <div id="errorAlert" class="hidden p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl font-medium"></div>
-
-        <div id="dashboard" class="hidden grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-medium text-gray-400">Umumiy loglar soni</h3>
-                <p id="statTotal" class="text-2xl font-bold text-blue-500 mt-1">0</p>
+        <div id="tableContainer" class="hidden bg-gray-800 rounded-xl border border-gray-750 p-6 space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <input type="text" id="searchInput" placeholder="F.I.Sh. yoki obyekt bo'yicha qidirish..." class="p-2.5 w-full md:w-80 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <span class="text-sm text-gray-400">Har bir satr: <b class="text-gray-200">1 ta kirish va unga mos chiqish</b> juftligidir.</span>
             </div>
-            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-medium text-gray-400">Shaxtadagi ishchilar (Hozir)</h3>
-                <p id="statInside" class="text-2xl font-bold text-amber-500 mt-1">0</p>
-            </div>
-            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-medium text-gray-400">Jami hisoblangan ish soati</h3>
-                <p id="statHours" class="text-2xl font-bold text-green-500 mt-1">0</p>
-            </div>
-            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-medium text-gray-400">Eng ko'p ishlagan xodim</h3>
-                <p id="statBest" class="text-base font-bold text-purple-500 mt-1 truncate">-</p>
-            </div>
-        </div>
-
-        <div id="tableContainer" class="hidden p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-            <input type="text" id="searchInput" placeholder="Xodim ismi yoki Qurilma bo'yicha qidirish..." class="p-2.5 w-full md:w-1/3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-            <div class="overflow-x-auto max-h-[550px] rounded-lg border border-gray-200 dark:border-gray-700">
+            
+            <div class="overflow-x-auto max-h-[600px] rounded-lg border border-gray-700">
                 <table class="w-full text-left text-sm border-collapse">
-                    <thead class="sticky top-0 bg-gray-100 dark:bg-gray-700 font-semibold text-gray-700 dark:text-gray-200 shadow-sm">
+                    <thead class="sticky top-0 bg-gray-750 font-semibold text-gray-200 shadow-sm z-10">
                         <tr>
-                            <th class="p-3">Sana & Vaqt</th>
-                            <th class="p-3">Xodim (Person Name)</th>
-                            <th class="p-3">Qurilma (Device)</th>
-                            <th class="p-3">Eshik / Yo'nalish</th>
-                            <th class="p-3">Status</th>
+                            <th class="p-3 bg-gray-700">F.I.Sh. (Person Name)</th>
+                            <th class="p-3 bg-gray-700">Kirish Vaqti</th>
+                            <th class="p-3 bg-gray-700">Chiqish Vaqti</th>
+                            <th class="p-3 bg-gray-700">Chiqqan Obyekti (Door)</th>
+                            <th class="p-3 bg-gray-700">Ishlagan Soati</th>
                         </tr>
                     </thead>
-                    <tbody id="tableBody" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+                    <tbody id="tableBody" class="divide-y divide-gray-700 text-gray-300"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <script>
-        let appData = [];
-
-        // Tungi rejim
-        const themeToggle = document.getElementById('themeToggle');
-        themeToggle.addEventListener('click', () => {
-            document.documentElement.classList.toggle('dark');
-            themeToggle.innerText = document.documentElement.classList.contains('dark') ? '☀️ Kunduzgi rejim' : '🌙 Tungi rejim';
-        });
+        let finalReport = [];
 
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('fileInput');
@@ -114,84 +96,96 @@
                     const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
                     
                     if (rows.length < 2) {
-                        showError("Xatolik: Excel fayli bo'sh!");
+                        showError("Xatolik: Excel fayli bo'sh yoki ma'lumot yetarli emas!");
                         return;
                     }
-                    processRawRows(rows);
+                    processExcelData(rows);
                 } catch (err) {
-                    showError("Xatolik: " + err.message);
+                    showError("Faylni o'qishda xatolik: " + err.message);
                 }
             };
             reader.readAsArrayBuffer(file);
         }
 
-        function processRawRows(rows) {
+        function processExcelData(rows) {
             const headers = rows[0].map(h => h.toString().trim());
             const idxTime = headers.findIndex(h => h === "Time");
             const idxName = headers.findIndex(h => h === "Person Name");
-            const idxDevice = headers.findIndex(h => h === "Device");
             const idxDoor = headers.findIndex(h => h === "Door");
 
-            if (idxTime === -1 || idxName === -1) {
-                showError("Xatolik: Excel faylida 'Time' va 'Person Name' ustunlari topilmadi!");
+            if (idxTime === -1 || idxName === -1 || idxDoor === -1) {
+                showError("Xatolik: Excelda majburiy ustunlar topilmadi! ('Time', 'Person Name', 'Door' bo'lishi shart)");
                 return;
             }
 
-            let totalHours = 0;
-            const workerHours = {};
-            const activeStatusMap = {};
-            
-            appData = rows.slice(1)
+            // Ma'lumotlarni tozalash va xronologik tartiblash (eskidan yangiga)
+            let rawLogs = rows.slice(1)
                 .filter(row => row[idxName] && row[idxName].toString().trim() !== "" && !row[idxName].toString().includes("Stranger"))
                 .map(row => {
-                    const deviceStr = row[idxDevice] ? row[idxDevice].toString() : "";
-                    const doorStr = row[idxDoor] ? row[idxDoor].toString() : "";
-                    let direction = "KIRISH";
-                    if (deviceStr.includes("Выход") || deviceStr.includes("Chiqish") || doorStr.includes("Чиқиш") || doorStr.includes("Выход") || doorStr.includes("Чилиш")) {
-                        direction = "CHIQISH";
-                    }
+                    const doorStr = row[idxDoor].toString().trim();
+                    let isExit = doorStr.toLowerCase().includes("chiqish") || doorStr.includes("Чиқиш") || doorStr.includes("Выход") || doorStr.toLowerCase().includes("выход");
                     return {
-                        time: row[idxTime].toString().trim(),
+                        timeStr: row[idxTime].toString().trim(),
+                        timeObj: new Date(row[idxTime].toString().trim()),
                         name: row[idxName].toString().trim(),
-                        device: deviceStr,
                         door: doorStr,
-                        direction: direction
+                        isExit: isExit
                     };
-                });
+                })
+                .filter(log => !isNaN(log.timeObj.getTime()));
 
-            appData.sort((a, b) => new Date(a.time) - new Date(b.time));
+            // Vaqt bo'yicha to'g'rilaymiz
+            rawLogs.sort((a, b) => a.timeObj - b.timeObj);
 
-            appData.forEach(log => {
-                const worker = log.name;
-                const logTime = new Date(log.time);
+            const workerSessions = {};
+            finalReport = [];
+            let totalHoursCalculated = 0;
 
-                if (log.direction === "KIRISH") {
-                    activeStatusMap[worker] = logTime;
-                } else if (log.direction === "CHIQISH" && activeStatusMap[worker]) {
-                    const diffMs = logTime - activeStatusMap[worker];
-                    const diffHours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
-                    if (diffHours > 0 && diffHours < 24) {
-                        workerHours[worker] = (workerHours[worker] || 0) + diffHours;
-                        totalHours += diffHours;
+            // Har bir xodim uchun Kirish va Chiqish juftligini topamiz
+            rawLogs.forEach(log => {
+                const name = log.name;
+
+                if (!log.isExit) {
+                    // Agar KIRISH bo'lsa, xotiraga saqlaymiz (oxirgi kirgan vaqtini yangilab boradi)
+                    workerSessions[name] = {
+                        inTime: log.timeStr,
+                        inObj: log.timeObj
+                    };
+                } else {
+                    // Agar CHIQISH bo'lsa va undan oldin o'sha xodimda KIRISH qaydi mavjud bo'lsa
+                    if (workerSessions[name]) {
+                        const inSession = workerSessions[name];
+                        const diffMs = log.timeObj - inSession.inObj;
+                        const diffHours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
+
+                        // Mantiqiy cheklov (1 daqiqadan ko'p va 24 soatdan kam bo'lgan smenalar)
+                        if (diffHours >= 0.01 && diffHours < 24) {
+                            finalReport.push({
+                                name: name,
+                                inTime: inSession.inTime,
+                                outTime: log.timeStr,
+                                outDoor: log.door,
+                                hours: diffHours
+                            });
+                            totalHoursCalculated += diffHours;
+                        }
+                        // Juftlik yopildi, o'chirib tashlaymiz
+                        delete workerSessions[name];
                     }
-                    delete activeStatusMap[worker];
                 }
             });
 
-            document.getElementById('statTotal').innerText = appData.length;
-            document.getElementById('statInside').innerText = Object.keys(activeStatusMap).length;
-            document.getElementById('statHours').innerText = totalHours.toFixed(1) + ' soat';
-            
-            let bestWorker = "-";
-            let maxHours = -1;
-            for (const [name, hours] of Object.entries(workerHours)) {
-                if (hours > maxHours) { maxHours = hours; bestWorker = `${name} (${hours.toFixed(1)} s)`; }
-            }
-            document.getElementById('statBest').innerText = bestWorker;
+            // Dashbord statistikasini yangilash
+            const uniqueWorkers = new Set(finalReport.map(r => r.name)).size;
+            document.getElementById('statTotal').innerText = rawLogs.length;
+            document.getElementById('statWorkers').innerText = uniqueWorkers;
+            document.getElementById('statHours').innerText = totalHoursCalculated.toFixed(1) + ' soat';
 
             document.getElementById('dashboard').classList.remove('hidden');
             document.getElementById('tableContainer').classList.remove('hidden');
-            renderTable([...appData].reverse());
+
+            // Jadvalga natijalarni eng oxirgisidan boshlab (teskari) chiqaramiz
+            renderTable([...finalReport].reverse());
         }
 
         function renderTable(dataList) {
@@ -201,25 +195,27 @@
 
             dataList.forEach(row => {
                 const tr = document.createElement('tr');
-                tr.className = "border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors";
-                const isKirish = row.direction === "KIRISH";
-                const badgeClass = isKirish ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+                tr.className = "border-b border-gray-700 hover:bg-gray-750 transition-colors";
 
                 tr.innerHTML = `
-                    <td class="p-3 text-gray-500 dark:text-gray-400">${row.time}</td>
-                    <td class="p-3 font-medium">${row.name}</td>
-                    <td class="p-3">${row.device}</td>
-                    <td class="p-3">${row.door || "-"}</td>
-                    <td class="p-3"><span class="px-2 py-1 rounded-md text-xs font-semibold ${badgeClass}">${isKirish ? 'KIRISH' : 'CHIQISH'}</span></td>
+                    <td class="p-3 font-semibold text-gray-200">${row.name}</td>
+                    <td class="p-3 text-green-400 font-mono">${row.inTime}</td>
+                    <td class="p-3 text-red-400 font-mono">${row.outTime}</td>
+                    <td class="p-3 text-gray-300 font-medium">${row.outDoor}</td>
+                    <td class="p-3 font-bold text-amber-400">${row.hours} s</td>
                 `;
                 fragment.appendChild(tr);
             });
             tbody.appendChild(fragment);
         }
 
+        // Qidiruv tizimi
         document.getElementById('searchInput').addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
-            const filtered = appData.filter(row => row.name.toLowerCase().includes(query) || row.device.toLowerCase().includes(query));
+            const filtered = finalReport.filter(row => 
+                row.name.toLowerCase().includes(query) || 
+                row.outDoor.toLowerCase().includes(query)
+            );
             renderTable([...filtered].reverse());
         });
     </script>
