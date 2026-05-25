@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SKUD Analytics - Zarmiton & Gujumsoy</title>
+    <title>SKUD Analitika - Zarmiton & Gujumsoy</title>
     <link rel="icon" href="data:,">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -20,15 +20,15 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400">Konchilik monitoringi va SKUD tizimi tahlili</p>
             </div>
             <button id="themeToggle" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow transition-all">
-                🌙 Dark Mode
+                🌙 Tungi rejim
             </button>
         </div>
 
         <div id="dropzone" class="p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-center bg-white dark:bg-gray-800 cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-colors">
             <input type="file" id="fileInput" accept=".xlsx, .xls" class="hidden">
             <div class="space-y-2">
-                <p id="dropzoneText" class="text-lg font-medium">Excel faylni bu yerga tashlang yoki tanlash uchun bosing</p>
-                <p class="text-sm text-gray-400">Haqiqiy loglar formati (Time, Device, Door, Person Name) bo'yicha avtomat tahlil</p>
+                <p class="text-lg font-medium">Excel faylni bu yerga tashlang yoki tanlash uchun bosing</p>
+                <p class="text-sm text-gray-400">Tizim (Time, Device, Door, Person Name) ustunlarini avtomat tahlil qiladi</p>
             </div>
         </div>
 
@@ -44,19 +44,17 @@
                 <p id="statInside" class="text-2xl font-bold text-amber-500 mt-1">0</p>
             </div>
             <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-medium text-gray-400">Jami hisoblangan soat</h3>
+                <h3 class="text-sm font-medium text-gray-400">Jami hisoblangan ish soati</h3>
                 <p id="statHours" class="text-2xl font-bold text-green-500 mt-1">0</p>
             </div>
             <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <h3 class="text-sm font-medium text-gray-400">Eng faol ishchi (Top)</h3>
+                <h3 class="text-sm font-medium text-gray-400">Eng ko'p ishlagan xodim</h3>
                 <p id="statBest" class="text-base font-bold text-purple-500 mt-1 truncate">-</p>
             </div>
         </div>
 
         <div id="tableContainer" class="hidden p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-            <div class="flex flex-col md:flex-row gap-4 justify-between items-center">
-                <input type="text" id="searchInput" placeholder="Xodim ismi yoki Qurilma bo'yicha qidirish..." class="p-2.5 w-full md:w-1/3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-            </div>
+            <input type="text" id="searchInput" placeholder="Xodim ismi yoki Qurilma bo'yicha qidirish..." class="p-2.5 w-full md:w-1/3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
             <div class="overflow-x-auto max-h-[550px] rounded-lg border border-gray-200 dark:border-gray-700">
                 <table class="w-full text-left text-sm border-collapse">
                     <thead class="sticky top-0 bg-gray-100 dark:bg-gray-700 font-semibold text-gray-700 dark:text-gray-200 shadow-sm">
@@ -77,11 +75,11 @@
     <script>
         let appData = [];
 
-        // Dark Mode toggle
+        // Tungi rejim tugmasi
         const themeToggle = document.getElementById('themeToggle');
         themeToggle.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
-            themeToggle.innerText = document.documentElement.classList.contains('dark') ? '☀️ Light Mode' : '🌙 Dark Mode';
+            themeToggle.innerText = document.documentElement.classList.contains('dark') ? '☀️ Kunduzgi rejim' : '🌙 Tungi rejim';
         });
 
         const dropzone = document.getElementById('dropzone');
@@ -113,34 +111,29 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    
-                    // { header: 1 } orqali birinchi qatordagi haqiqiy nomlarni o'qiymiz
                     const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
                     
                     if (rows.length < 2) {
-                        showError("Xatolik: Excel fayli bo'sh yoki ma'lumot yetarli emas!");
+                        showError("Xatolik: Excel fayli bo'sh!");
                         return;
                     }
-                    
                     processRawRows(rows);
                 } catch (err) {
-                    showError("Faylni tahlil qilishda xatolik: " + err.message);
+                    showError("Xatolik: " + err.message);
                 }
             };
             reader.readAsArrayBuffer(file);
         }
 
         function processRawRows(rows) {
-            // Birinchi qatordan ustunlar indeksini aniqlaymiz (Masalan: Time -> 0, Person Name -> 7)
             const headers = rows[0].map(h => h.toString().trim());
-            
             const idxTime = headers.findIndex(h => h === "Time");
             const idxName = headers.findIndex(h => h === "Person Name");
             const idxDevice = headers.findIndex(h => h === "Device");
             const idxDoor = headers.findIndex(h => h === "Door");
 
             if (idxTime === -1 || idxName === -1) {
-                showError("Xatolik: Excel faylida 'Time' yoki 'Person Name' ustunlari topilmadi! Iltimos asl SKUD eksport faylini yuklang.");
+                showError("Xatolik: Excel faylida 'Time' va 'Person Name' ustunlari topilmadi!");
                 return;
             }
 
@@ -148,35 +141,26 @@
             const workerHours = {};
             const activeStatusMap = {};
             
-            // Ma'lumot qatorlarini tozalash va formatlash
             appData = rows.slice(1)
                 .filter(row => row[idxName] && row[idxName].toString().trim() !== "" && !row[idxName].toString().includes("Stranger"))
                 .map(row => {
-                    const name = row[idxName].toString().trim();
-                    const timeStr = row[idxTime].toString().trim();
                     const deviceStr = row[idxDevice] ? row[idxDevice].toString() : "";
                     const doorStr = row[idxDoor] ? row[idxDoor].toString() : "";
-                    
-                    // Yo'nalishni matndan qidirish (Вход / Выход / Кириш / Чиқиш)
                     let direction = "KIRISH";
-                    if (deviceStr.includes("Выход") || deviceStr.includes("Chiqish") || 
-                        doorStr.includes("Чиқиш") || doorStr.includes("Выход") || doorStr.includes("Чилиш")) {
+                    if (deviceStr.includes("Выход") || deviceStr.includes("Chiqish") || doorStr.includes("Чиқиш") || doorStr.includes("Выход")) {
                         direction = "CHIQISH";
                     }
-
                     return {
-                        time: timeStr,
-                        name: name,
+                        time: row[idxTime].toString().trim(),
+                        name: row[idxName].toString().trim(),
                         device: deviceStr,
                         door: doorStr,
                         direction: direction
                     };
                 });
 
-            // Xronologik tartibda saralash (Eski vaqtdan yangi vaqtga qarab)
             appData.sort((a, b) => new Date(a.time) - new Date(b.time));
 
-            // Ish soatlarini hisoblash logikasi
             appData.forEach(log => {
                 const worker = log.name;
                 const logTime = new Date(log.time);
@@ -186,38 +170,27 @@
                 } else if (log.direction === "CHIQISH" && activeStatusMap[worker]) {
                     const diffMs = logTime - activeStatusMap[worker];
                     const diffHours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
-                    
                     if (diffHours > 0 && diffHours < 24) {
                         workerHours[worker] = (workerHours[worker] || 0) + diffHours;
                         totalHours += diffHours;
                     }
-                    delete activeStatusMap[worker]; // Chiqdi deb o'chiramiz
+                    delete activeStatusMap[worker];
                 }
             });
 
-            // Hozir ichkarida bo'lgan xodimlar soni
-            const insideCount = Object.keys(activeStatusMap).length;
-
-            // Eng faol xodim
+            document.getElementById('statTotal').innerText = appData.length;
+            document.getElementById('statInside').innerText = Object.keys(activeStatusMap).length;
+            document.getElementById('statHours').innerText = totalHours.toFixed(1) + ' soat';
+            
             let bestWorker = "-";
             let maxHours = -1;
             for (const [name, hours] of Object.entries(workerHours)) {
-                if (hours > maxHours) {
-                    maxHours = hours;
-                    bestWorker = `${name} (${hours.toFixed(1)} soat)`;
-                }
+                if (hours > maxHours) { maxHours = hours; bestWorker = `${name} (${hours.toFixed(1)} s)`; }
             }
-
-            // Statisika paneli yuklash
-            document.getElementById('statTotal').innerText = rows.length - 1;
-            document.getElementById('statInside').innerText = insideCount;
-            document.getElementById('statHours').innerText = totalHours.toFixed(1) + ' soat';
             document.getElementById('statBest').innerText = bestWorker;
 
             document.getElementById('dashboard').classList.remove('hidden');
             document.getElementById('tableContainer').classList.remove('hidden');
-
-            // Oxirgi harakatlarni birinchi qilib jadvalga chiqaramiz
             renderTable([...appData].reverse());
         }
 
@@ -229,22 +202,15 @@
             dataList.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.className = "border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors";
-                
                 const isKirish = row.direction === "KIRISH";
-                const badgeClass = isKirish 
-                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                    : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+                const badgeClass = isKirish ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
 
                 tr.innerHTML = `
-                    <td class="p-3 whitespace-nowrap text-gray-500 dark:text-gray-400">${row.time}</td>
+                    <td class="p-3 text-gray-500 dark:text-gray-400">${row.time}</td>
                     <td class="p-3 font-medium">${row.name}</td>
                     <td class="p-3">${row.device}</td>
                     <td class="p-3">${row.door || "-"}</td>
-                    <td class="p-3">
-                        <span class="px-2 py-1 rounded-md text-xs font-semibold ${badgeClass}">
-                            ${isKirish ? 'КИРИШ' : 'ЧИҚИШ'}
-                        </span>
-                    </td>
+                    <td class="p-3"><span class="px-2 py-1 rounded-md text-xs font-semibold ${badgeClass}">${isKirish ? 'KIRISH' : 'CHIQISH'}</span></td>
                 `;
                 fragment.appendChild(tr);
             });
@@ -253,10 +219,7 @@
 
         document.getElementById('searchInput').addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
-            const filtered = appData.filter(row => 
-                row.name.toLowerCase().includes(query) || 
-                row.device.toLowerCase().includes(query)
-            );
+            const filtered = appData.filter(row => row.name.toLowerCase().includes(query) || row.device.toLowerCase().includes(query));
             renderTable([...filtered].reverse());
         });
     </script>
