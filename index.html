@@ -10,8 +10,8 @@
     <div class="max-w-6xl mx-auto">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <input type="file" id="fileInput" class="col-span-2 bg-gray-800 p-3 rounded-lg border border-gray-700 cursor-pointer" />
-            <button onclick="loadFast()" class="bg-indigo-600 hover:bg-indigo-700 py-3 rounded-lg font-bold">✅ 1. Тасдиқлаш</button>
-            <button id="filterBtn" onclick="filterFast()" disabled class="bg-blue-600 py-3 rounded-lg opacity-50 cursor-not-allowed font-bold">🔍 2. Фильтрлаш</button>
+            <button onclick="handleFileUpload()" class="bg-indigo-600 hover:bg-indigo-700 py-3 rounded-lg font-bold">✅ 1. Тасдиқлаш</button>
+            <button id="filterBtn" onclick="runFilter()" disabled class="bg-blue-600 py-3 rounded-lg opacity-50 cursor-not-allowed font-bold">🔍 2. Фильтрлаш</button>
         </div>
         
         <table class="w-full text-left bg-gray-800 rounded-xl overflow-hidden shadow-xl">
@@ -23,54 +23,66 @@
     </div>
 
     <script>
-        let data = [];
-        let filtered = [];
+        let excelData = [];
 
-        // 1. Тезкор файл ўқиш
-        function loadFast() {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) return alert("Файл танланг!");
+        // 1. Файлни ўқиш (Оптимизация қилинган)
+        async function handleFileUpload() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) return alert("Файл танланг!");
+
+            const file = fileInput.files[0];
+            const buffer = await file.arrayBuffer();
             
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const wb = XLSX.read(e.target.result, {type: 'array'});
-                data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                document.getElementById('filterBtn').disabled = false;
-                document.getElementById('filterBtn').classList.replace('opacity-50', 'opacity-100');
-                document.getElementById('filterBtn').classList.remove('cursor-not-allowed');
-                alert("Маълумот юкланди: " + data.length + " қатор.");
-            };
-            reader.readAsArrayBuffer(file);
+            // Тезкор ўқиш режими
+            const wb = XLSX.read(buffer, { type: "array", dense: true });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            
+            excelData = XLSX.utils.sheet_to_json(ws, { raw: true, defval: "" });
+            
+            document.getElementById('filterBtn').disabled = false;
+            document.getElementById('filterBtn').classList.replace('opacity-50', 'opacity-100');
+            document.getElementById('filterBtn').classList.remove('cursor-not-allowed');
+            alert("Файл юкланди: " + excelData.length + " қатор.");
         }
 
-        // 2. Тезкор фильтрлаш
-        function filterFast() {
+        // 2. Фильтрлаш ва ҳисоблаш (Тезкор мантиқ)
+        function runFilter() {
             let map = {};
-            data.forEach(r => {
-                let name = r['Person Name'] || r['ФИО'] || r['Исм'];
-                let time = new Date(r['Time'] || r['Вақт']);
-                let id = r['ID'] || r['Табель'];
+            
+            excelData.forEach(row => {
+                // Устунларни динамик топиш
+                let name = row['Person Name'] || row['ФИО'] || row['Исм'] || "";
+                let timeStr = row['Time'] || row['Вақт'] || "";
+                let id = row['ID'] || row['Табель'] || "";
                 
-                if(!name || isNaN(time)) return;
-                if(!map[name]) map[name] = {min: time, max: time, id: id};
+                if (!name || !timeStr) return;
+                
+                let time = new Date(timeStr);
+                if (isNaN(time)) return;
+
+                if (!map[name]) map[name] = { min: time, max: time, id: id };
                 else {
-                    if(time < map[name].min) map[name].min = time;
-                    if(time > map[name].max) map[name].max = time;
+                    if (time < map[name].min) map[name].min = time;
+                    if (time > map[name].max) map[name].max = time;
                 }
             });
 
-            filtered = Object.keys(map).map(n => {
-                let hours = (map[n].max - map[n].min) / 3600000;
-                return {id: map[n].id, name: n, hours: hours.toFixed(1)};
-            }).filter(i => i.hours < 8);
-
+            // Натижани жадвалга чиқариш
             const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = filtered.map(i => `
-                <tr class="border-t border-gray-700">
-                    <td class="p-4">${i.id}</td>
-                    <td class="p-4">${i.name}</td>
-                    <td class="p-4 text-red-400 font-bold">${i.hours} соат</td>
-                </tr>`).join('');
+            tbody.innerHTML = "";
+            
+            Object.keys(map).forEach(name => {
+                let hours = (map[name].max - map[name].min) / 3600000;
+                if (hours < 8) { // 8 соатдан камлар
+                    tbody.innerHTML += `
+                        <tr class="border-t border-gray-700">
+                            <td class="p-4">${map[name].id}</td>
+                            <td class="p-4">${name}</td>
+                            <td class="p-4 text-red-400 font-bold">${hours.toFixed(1)} соат</td>
+                        </tr>`;
+                }
+            });
+            alert("Фильтрлаш тугалланди!");
         }
     </script>
 </body>
