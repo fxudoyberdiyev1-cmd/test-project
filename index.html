@@ -13,9 +13,9 @@
         <div class="flex items-center justify-between border-b border-gray-800 pb-5 mb-6">
             <div class="flex items-center space-x-3">
                 <span class="text-3xl">📊</span>
-                <h1 class="text-2xl font-bold tracking-tight text-white">СКУД Тизими: Ишчиларни Саралаш (Зармитан / Гужумсой)</h1>
+                <h1 class="text-2xl font-bold tracking-tight text-white">СКУД Тизими: Ишчиларни Саралаш (Зармитан / Gujumsoy)</h1>
             </div>
-            <span class="bg-blue-500/10 text-blue-400 text-xs px-2.5 py-1 rounded-full font-mono border border-blue-500/20">v1.1.0</span>
+            <span class="bg-blue-500/10 text-blue-400 text-xs px-2.5 py-1 rounded-full font-mono border border-blue-500/20">v1.2.0</span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -40,7 +40,7 @@
         </div>
 
         <div id="statsPanel" class="hidden mb-4 p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-sm font-medium">
-            Умумий ходимлар: <span id="totalCount" class="font-bold">0</span> та. Кам ишлаган қоидабузарлар: <span id="badCount" class="font-bold text-red-400">0</span> та.
+            Умумий қаторлар: <span id="totalCount" class="font-bold">0</span> та. Кам ишлаган ходимлар: <span id="badCount" class="font-bold text-red-400">0</span> та.
         </div>
 
         <div class="bg-gray-800/30 rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
@@ -69,10 +69,10 @@
         let excelData = [];
         let globalFilteredData = [];
 
-        // Калит сўзларни автоматик аниқлаш функцияси
+        // Устун қидириш функцияси
         function findValue(row, keys) {
             for (let key of Object.keys(row)) {
-                const normalizedKey = key.toString().toLowerCase().trim();
+                const normalizedKey = key.toString().toLowerCase().trim().replace(/[\s_\.]/g, '');
                 if (keys.some(k => normalizedKey.includes(k))) {
                     return row[key];
                 }
@@ -80,7 +80,16 @@
             return null;
         }
 
-        // Excel файлни ўқиш
+        // Матндан соф рақам ажратиб олиш функцияси
+        function parseHours(val) {
+            if (val === null || val === undefined) return 0;
+            // Агар вергул бўлса нуқтага алмаштирамиз
+            let str = val.toString().replace(',', '.').replace(/[^0-9\.]/g, '').trim();
+            let num = parseFloat(str);
+            return isNaN(num) ? 0 : num;
+        }
+
+        // Excel ўқиш
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -94,15 +103,15 @@
                     const worksheet = workbook.Sheets[firstSheetName];
                     
                     excelData = XLSX.utils.sheet_to_json(worksheet);
-                    alert("Excel файл муваффақиятли юкланди! Жами қаторлар: " + excelData.length);
+                    alert("Excel юкланди! Жами қаторлар: " + excelData.length);
                 } catch (error) {
-                    alert("Файл ўқишда хатолик. Excel форматини текширинг.");
+                    alert("Файлни ўқишда хатолик.");
                 }
             };
             reader.readAsArrayBuffer(file);
         });
 
-        // Фильтрлаш функцияси
+        // Фильтрлаш
         function filterData() {
             if (excelData.length === 0) {
                 alert("Илтимос, аввал Excel файлни юкланг!");
@@ -112,18 +121,15 @@
             const targetHours = parseFloat(document.getElementById('hoursInput').value) || 8;
 
             globalFilteredData = excelData.filter(row => {
-                // Иш соати устунини қидириш (турли тилларда)
-                const hoursVal = findValue(row, ['соат', 'часы', 'hours', 'иш соат', 'отработанно', 'иш соати']);
-                const hours = parseFloat(hoursVal || 0);
+                const hoursVal = findValue(row, ['соат', 'часы', 'hours', 'ишсоат', 'отработанно', 'ишсоати', 'время', 'duration']);
+                const hours = parseHours(hoursVal);
                 
-                // Агар қатор бутунлай бўш бўлса ёки исми йўқ бўлса ўтказиб юборамиз
-                const nameVal = findValue(row, ['фио', 'ф.и.ш', 'исм', 'ходим', 'имя', 'fio']);
-                if (!nameVal && hours === 0) return false;
+                const nameVal = findValue(row, ['фио', 'фиш', 'исм', 'ходим', 'имя', 'fio', 'fio']);
+                if (!nameVal && hours === 0) return false; // Бўм-бўш қаторларни ташлаб юбориш
 
                 return hours < targetHours;
             });
 
-            // Статистикани янгилаш
             document.getElementById('statsPanel').classList.remove('hidden');
             document.getElementById('totalCount').innerText = excelData.length;
             document.getElementById('badCount').innerText = globalFilteredData.length;
@@ -142,11 +148,11 @@
             }
 
             data.forEach(row => {
-                // Ақлли қидирув тизими орқали устунларни топиш
-                const id = findValue(row, ['ид', 'id', 'табель', 'номер', 'код']) || '-';
-                const fio = findValue(row, ['фио', 'ф.и.ш', 'исм', 'ходим', 'имя', 'fio']) || '-';
-                const department = findValue(row, ['бўлим', 'отдел', 'цех', 'департамент', 'отделение']) || '-';
-                const hours = findValue(row, ['соат', 'часы', 'hours', 'иш соат', 'отработанно', 'иш соати']) || 0;
+                const id = findValue(row, ['ид', 'id', 'табель', 'номер', 'код', 'табельный']) || '-';
+                const fio = findValue(row, ['фио', 'фиш', 'исм', 'ходим', 'имя', 'fio']) || '-';
+                const department = findValue(row, ['бўлим', 'отдел', 'цех', 'департамент', 'отделение', 'служба']) || '-';
+                const hoursVal = findValue(row, ['соат', 'часы', 'hours', 'ишсоат', 'отработанно', 'ишсоати', 'время', 'duration']);
+                const hours = parseHours(hoursVal);
 
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-800/40 transition text-gray-300 border-b border-gray-800/50";
