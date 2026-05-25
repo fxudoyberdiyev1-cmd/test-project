@@ -1,34 +1,101 @@
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 col-span-2">
-        <label class="block text-sm font-medium text-gray-400 mb-2">Excel файлни танланг:</label>
-        <input type="file" id="fileInput" accept=".xlsx, .xls" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:bg-blue-600 file:text-white cursor-pointer" />
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <title>СКУД - Ишчиларни Фильтрлаш</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 p-6">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold mb-6">СКУД Тизими: Ишчиларни Саралаш</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-800 p-4 rounded-xl col-span-2">
+                <label class="block text-sm text-gray-400 mb-2">Excel файл:</label>
+                <input type="file" id="fileInput" class="w-full text-sm text-gray-400 file:bg-blue-600 file:text-white file:border-0 file:px-4 file:py-2 file:rounded-lg cursor-pointer" />
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-xl">
+                <label class="block text-sm text-gray-400 mb-2">Тасдиқлаш:</label>
+                <button onclick="processFile()" class="w-full bg-indigo-600 py-2 rounded-lg hover:bg-indigo-700 transition">✅ Тасдиқлаш</button>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-xl">
+                <label class="block text-sm text-gray-400 mb-2">Фильтрлаш:</label>
+                <button id="filterBtn" onclick="filterData()" disabled class="w-full bg-blue-600 py-2 rounded-lg opacity-50 cursor-not-allowed">🔍 Фильтрлаш</button>
+            </div>
+        </div>
+
+        <div id="statsPanel" class="hidden mb-4 p-3 bg-blue-900/30 border border-blue-800 rounded-xl text-sm">
+            Ходимлар: <span id="totalCount" class="font-bold">0</span>. Кам ишлаганлар: <span id="badCount" class="font-bold text-red-400">0</span>.
+            <button onclick="downloadFiltered()" class="ml-4 bg-emerald-600 px-3 py-1 rounded">📥 Excel Юклаш</button>
+        </div>
+
+        <table class="w-full text-left bg-gray-800 rounded-xl overflow-hidden">
+            <thead class="bg-gray-700 text-xs uppercase">
+                <tr><th class="p-3">ИД</th><th class="p-3">Ф.И.Ш.</th><th class="p-3">Соат</th></tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
     </div>
 
-    <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 flex items-end">
-        <button onclick="processFile()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition active:scale-95">
-            ✅ Тасдиқлаш
-        </button>
-    </div>
+    <script>
+        let excelData = [];
+        let globalFilteredData = [];
 
-    <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-800 flex items-end">
-        <button id="filterBtn" onclick="filterData()" disabled class="w-full bg-blue-600 opacity-50 cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition active:scale-95">
-            🔍 Фильтрлаш
-        </button>
-    </div>
-</div>
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const workbook = XLSX.read(e.target.result, {type: 'array'});
+                excelData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {raw: false});
+                alert("Файл юкланди!");
+            };
+            reader.readAsArrayBuffer(file);
+        });
 
-<script>
-    // Файлни тасдиқлаш функцияси
-    function processFile() {
-        if (excelData.length === 0) {
-            alert("Аввал файлни танланг!");
-            return;
+        function processFile() {
+            if(excelData.length === 0) return alert("Аввал файл танланг!");
+            document.getElementById('filterBtn').disabled = false;
+            document.getElementById('filterBtn').classList.replace('opacity-50', 'opacity-100');
+            document.getElementById('filterBtn').classList.remove('cursor-not-allowed');
+            alert("Маълумотлар тайёр, фильтрлашни босинг.");
         }
-        document.getElementById('filterBtn').disabled = false;
-        document.getElementById('filterBtn').classList.remove('opacity-50', 'cursor-not-allowed');
-        alert("Маълумотлар тасдиқланди. Энди фильтрлашни босинг.");
-    }
-    
-    // filterData функцияси ичига қўшимча равишда экспорт тугмасини ҳам қўшишингиз мумкин
-    // ... қолган қисми аввалгидек ...
-</script>
+
+        function filterData() {
+            let workersMap = {};
+            excelData.forEach(row => {
+                const name = row['Person Name'] || row['ФИО'];
+                const time = new Date(row['Time'] || row['Time']);
+                if(!name || isNaN(time)) return;
+                
+                if(!workersMap[name]) workersMap[name] = { min: time, max: time, id: row['ID'] };
+                else {
+                    if(time < workersMap[name].min) workersMap[name].min = time;
+                    if(time > workersMap[name].max) workersMap[name].max = time;
+                }
+            });
+
+            globalFilteredData = Object.keys(workersMap).map(name => {
+                const hours = (workersMap[name].max - workersMap[name].min) / 3600000;
+                return { ID: workersMap[name].id, Name: name, Hours: hours.toFixed(1) };
+            }).filter(w => w.Hours < 8);
+
+            document.getElementById('statsPanel').classList.remove('hidden');
+            document.getElementById('totalCount').innerText = Object.keys(workersMap).length;
+            document.getElementById('badCount').innerText = globalFilteredData.length;
+            
+            const body = document.getElementById('tableBody');
+            body.innerHTML = globalFilteredData.map(w => `<tr><td class="p-3">${w.ID}</td><td class="p-3">${w.Name}</td><td class="p-3 text-red-400">${w.Hours} соат</td></tr>`).join('');
+        }
+
+        function downloadFiltered() {
+            const ws = XLSX.utils.json_to_sheet(globalFilteredData);
+            const wb = XLSX.utils.book_new();
+            XLSX.book_append_sheet(wb, ws, "Натижа");
+            XLSX.writeFile(wb, "Result.xlsx");
+        }
+    </script>
+</body>
+</html>
